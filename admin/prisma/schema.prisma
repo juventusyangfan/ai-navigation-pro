@@ -1,0 +1,198 @@
+// 教AI导航 · 后台管理系统 MVP Schema
+// 合并模型：Tool.paths[] → sop_paths + sop_steps；USAGES 合并进 sop_paths（is_library_pick）
+// SQLite 不支持原生数组/JSON 列，数组与 JSON 均以 String(JSON.stringify) 存储，应用层用 src/lib/serialize.ts 解析。
+// 换 Postgres：把 provider 改为 postgresql、相关 String 列改为 Json/枚举即可（README 有说明）。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------- 分类法 ----------------
+model Category {
+  key   String @id
+  name  String
+  icon  String
+  phase String
+  desc  String
+  order Int    @default(0)
+}
+
+model Scene {
+  key   String @id
+  name  String
+  cat   String // Category.key
+  icon  String
+  roles String // JSON Role[]
+}
+
+// ---------------- 内容 ----------------
+model Tool {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  name       String
+  logo       String
+  color      String
+  tagline    String
+  url        String
+  roles      String // JSON Role[]
+  scenes     String // JSON scene key[]
+  subjects   String // JSON string[]
+  pricing    String // Free|Freemium|Paid|Enterprise
+  platform   String
+  rating     Float    @default(0)
+  pros       String // JSON string[]
+  cons       String // JSON string[]
+  compliance String
+  alts       String // JSON string[]
+  status     String   @default("published") // draft|published
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  paths      SopPath[]
+}
+
+model SopPath {
+  id            String    @id @default(cuid())
+  toolId        String
+  tool          Tool      @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  title         String
+  summary       String?
+  estMinutes    Int?
+  level         String? // 入门|进阶|熟练
+  forRole       String? // Role（用法库条目角色，seed 取自 USAGES.role）
+  scene         String? // 用法库条目场景（seed 取自 USAGES.scene），保证远程与静态 USAGES 一致
+  subj          String? // 用法库条目学科（seed 取自 USAGES.subj）
+  isLibraryPick Boolean   @default(false)
+  usefulCount   Int       @default(0)
+  collectCount  Int       @default(0)
+  order         Int       @default(0)
+  usageId       String? // 与 front data.ts 的 USAGES.id 关联（seed 用）
+  steps         SopStep[]
+}
+
+model SopStep {
+  id           String @id @default(cuid())
+  pathId       String
+  path         SopPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  stepOrder    Int
+  goal         String?
+  action       String
+  prompt       String
+  outputSample String
+  mediaType    String? // image|video|file
+  mediaUrl     String?
+  mediaLabel   String?
+  pitfall      String?
+  tip          String?
+  branch       String? // JSON {when,then}[]
+}
+
+// ---------------- 公开站账号与互动（Phase 3 落库，表先建好） ----------------
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String?
+  role         String   @default("teacher") // 老师|学生|家长
+  createdAt    DateTime @default(now())
+  ratings      Rating[]
+  favorites    Favorite[]
+  notes        Note[]
+  feedback     Feedback[]
+  submissions  Submission[]
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  toolId    String
+  score     Float
+  comment   String?
+  isVerified Boolean @default(false)
+  createdAt DateTime @default(now())
+  @@unique([userId, toolId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  toolId    String
+  createdAt DateTime @default(now())
+  @@unique([userId, toolId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  refType   String
+  refId     String
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  toolId    String
+  type      String
+  text      String
+  status    String   @default("pending") // pending|approved|rejected
+  createdAt DateTime @default(now())
+}
+
+model Submission {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  type       String
+  payload    String // JSON
+  status     String   @default("pending")
+  reviewerId String?
+  createdAt  DateTime @default(now())
+}
+
+// ---------------- RBAC ----------------
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id])
+  status       String   @default("active") // active|disabled
+  createdAt    DateTime @default(now())
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  key         String       @unique // super_admin|editor|reviewer|school_admin
+  name        String
+  admins      AdminUser[]
+  permissions RolePermission[]
+}
+
+model RolePermission {
+  id       String @id @default(cuid())
+  roleId   String
+  role     Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  resource String // tools|sops|taxonomy|media|ratings|feedback|submissions|users|roles|site|analytics|pushes
+  action   String // read|write|delete|review
+  @@unique([roleId, resource, action])
+}
+
+// 学校管理员推送（落地原"幽灵角色"价值）
+model Push {
+  id            String   @id @default(cuid())
+  schoolAdminId String
+  sopPathId     String
+  target        String
+  sentAt        DateTime @default(now())
+}
