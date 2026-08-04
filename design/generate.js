@@ -332,6 +332,10 @@ function mediaHtml(m) {
 
 /* ---------------- 页面：首页 ---------------- */
 function renderHome() {
+  const totalTools = TOOLS.length;
+  const totalSops = USAGES.length;
+  const totalScenes = SCENES.length;
+
   const sceneCards = SCENES.map(s => {
     const roles = s.roles.map(r => `<span class="rb rb-${roleClass(r)}">${r}</span>`).join('');
     const rep = TOOLS.filter(t => (t.scenes || []).includes(s.key)).slice(0, 2).map(t => `<span class="rt">${esc(t.name)}</span>`).join('');
@@ -347,6 +351,7 @@ function renderHome() {
       ${sopN ? `<a class="scene-sop-link" href="usages.html?scene=${s.key}">📘 ${sopN} 个用法 SOP →</a>` : ''}
     </div>`;
   }).join('');
+
   const homeRoleTabs = `
     <div class="role-tabs" style="margin:6px 0 18px">
       <button class="active" data-role="all">全部角色</button>
@@ -354,26 +359,71 @@ function renderHome() {
       <button data-role="学生">学生</button>
       <button data-role="家长">家长</button>
     </div>`;
+
   const trending = TOOLS.slice(0, 6).map(toolCard).join('');
   const latest = TOOLS.slice(6).map(toolCard).join('');
+
+  /* Spotlight: pick the first editor-pick usage */
+  const spotUsage = USAGES.find(u => u.pick) || USAGES[0];
+  const spotTool = TOOL_MAP[spotUsage.tool];
+
   const body = `
   <section class="hero">
     <h1>老师家长的 <span class="hl">AI 工具地图</span><br>不止找到，更教你怎么用</h1>
     <p>按角色与教学场景整理 AI 工具，每个工具都配「分步使用路径 + 可复制提示词」，让 AI 真正落进课堂。</p>
     <form class="hero-search" action="index.html" method="get"><div class="searchbar" style="width:100%"><span>🔍</span><input name="q" placeholder="试试搜：初三数学 / 评语 / 课件"></div><button class="btn btn-primary" type="submit">搜索</button></form>
     <div class="hero-chips">${SCENES.slice(0, 6).map(s => `<a class="chip" href="scene-${s.key}.html">${s.name}</a>`).join('')}</div>
+    <div class="term-prompt"><span class="tp-arrow">❯</span> 试试说「帮我找能做课件的 AI 工具」<span class="tp-cursor"></span></div>
   </section>
-  <section class="block">
+
+  <div class="stats-ticker">
+    <div class="st-item"><div class="st-val">${totalTools}</div><div class="st-lbl">收录工具</div></div>
+    <div class="st-item"><div class="st-val">${totalSops}</div><div class="st-lbl">使用路径 SOP</div></div>
+    <div class="st-item"><div class="st-val">${totalScenes}</div><div class="st-lbl">教学场景</div></div>
+    <div class="st-item"><div class="st-val">${SCENES.map(s=>s.roles).flat().filter((v,i,a)=>a.indexOf(v)===i).length}</div><div class="st-lbl">覆盖角色</div></div>
+  </div>
+
+  <section class="block" style="padding-top:28px">
     <div class="sec-head"><div><h2>按教学场景找工具</h2><div class="sub">先选身份，再挑场景：点卡片直达对应工具</div></div><a class="link-more" href="scenes.html">查看全部场景 →</a></div>
     ${homeRoleTabs}
-    <div class="scene-grid">${sceneCards}</div>
+    <div class="bento-grid">${sceneCards}</div>
   </section>
-  <section class="block">
+
+  <div class="divider-geo"></div>
+
+  <section class="block" style="padding-top:28px">
+    <div class="sec-head"><div><h2>精选用法推荐</h2><div class="sub">帮你看到工具怎么真正用起来</div></div><a class="link-more" href="usages.html">逛用法库 →</a></div>
+    <div class="spotlight">
+      <a class="spotlight-main" href="tool-${spotUsage.tool}.html">
+        <span class="sm-label">◆ 编辑精选</span>
+        <h3>${esc(spotUsage.title)}</h3>
+        <p>${esc(spotUsage.summary)}</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+          <span style="font-family:var(--font-mono);font-size:12px;color:var(--primary)">${esc(spotUsage.steps)} 步操作</span>
+          <span style="color:var(--muted)">·</span>
+          <span style="font-size:12px;color:var(--muted)">${esc(spotTool ? spotTool.name : spotUsage.tool)}</span>
+        </div>
+      </a>
+      <div class="spotlight-side">
+        ${USAGES.filter(u => u.pick && u.id !== spotUsage.id).slice(0, 2).map(u => {
+          const t = TOOL_MAP[u.tool];
+          return `<a class="ss-card" href="tool-${u.tool}.html">
+            <div class="ss-num">${String(u.steps).padStart(2,'0')}</div>
+            <h4>${esc(u.title)}</h4>
+            <p>${esc(t ? t.name : u.tool)} · ${esc(u.subj)}</p>
+          </a>`;
+        }).join('')}
+      </div>
+    </div>
+  </section>
+
+  <section class="block" style="padding-top:10px">
     <a class="feat-cta" href="ailiteracy.html">
-      <div class="feat-cta-l"><span class="feat-ico">🎓</span><div><b>AI通识课 · 系统学 AI 基础</b><div class="muted" style="font-weight:400;font-size:13px">从「什么是大模型」→「提示词」→「伦理安全」→「学科应用」，一套渐进式学习路径，配工具与 SOP。</div></div></div>
+      <div class="feat-cta-l"><span class="feat-ico">🎓</span><div><b>AI通识课 · 系统学 AI 基础</b><div class="muted" style="font-weight:400;font-size:12.5px">从「什么是大模型」→「提示词」→「伦理安全」→「学科应用」，一套渐进式学习路径，配工具与 SOP。</div></div></div>
       <span class="feat-go">开始学习 →</span>
     </a>
   </section>
+
   <section class="block">
     <div class="sec-head"><div><h2>热门用法工具</h2><div class="sub">老师们正在用这些提效</div></div><a class="link-more" href="usages.html">逛用法库 →</a></div>
     <div class="tool-grid">${trending}</div>
@@ -383,8 +433,8 @@ function renderHome() {
     <div class="tool-grid">${latest}</div>
   </section>
   <section class="block">
-    <div class="card" style="background:var(--primary-soft);border-color:#c7d2fe">
-      <h3 style="color:var(--primary-dark)">📩 每周一封「新工具 + 一个用法 SOP」</h3>
+    <div class="card" style="background:var(--primary-soft);border-color:rgba(0,204,255,.15)">
+      <h3 style="color:var(--primary)">📩 每周一封「新工具 + 一个用法 SOP」</h3>
       <p class="muted" style="margin:6px 0 14px">留下邮箱，跟上 AI 助教的最前线。</p>
       <form class="hero-search" onsubmit="EA.toast('已订阅（原型）');return false"><div class="searchbar" style="width:100%"><span>✉️</span><input placeholder="you@school.edu.cn"></div><button class="btn btn-primary" type="submit">订阅</button></form>
     </div>
