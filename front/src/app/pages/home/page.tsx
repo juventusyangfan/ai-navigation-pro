@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { content, type Role, type Tool, type Usage, type Scene, roleClass, pricingLabel } from "@/lib/content";
 import { Icon } from "@/lib/icons";
 import FavButton from "@/components/FavButton";
+import ToolLogo from "@/components/ToolLogo";
 
 const ROLE_TABS: { key: "all" | Role; label: string }[] = [
   { key: "all", label: "全部角色" },
@@ -24,9 +25,6 @@ const HOT_SCENE_KEYS = [
   "keti",
   "shijian",
 ];
-
-const HOT_TOOL_SLUGS = ["doubao", "deepseek", "glm", "kimi", "mistral", "bishun"];
-const LATEST_TOOL_SLUGS = ["gamma", "canva", "jianying", "wenxin", "tongyi", "wenku"];
 
 export default function HomePage() {
   const router = useRouter();
@@ -49,7 +47,20 @@ export default function HomePage() {
     return s.roles.includes(activeRole);
   });
 
-  const hotUsages = usages.filter((u) => u.pick).slice(0, 3);
+  const hotUsages = usages
+    .filter((u) => u.pick)
+    .sort((a, b) => b.useful - a.useful)
+    .slice(0, 3);
+
+  const hotTools = [...tools]
+    .filter((t) => t.paths.length > 0)
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 6);
+
+  const latestTools = [...tools]
+    .filter((t) => t.paths.length > 0)
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 6);
 
   return (
     <main>
@@ -317,16 +328,14 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="tool-grid">
-            {HOT_TOOL_SLUGS.map((slug) => {
-              const tool = tools.find((t) => t.slug === slug);
-              if (!tool) return null;
+            {hotTools.map((tool) => {
               const sopCount = tool.paths.length;
               return (
-                <div key={slug} className="tool-card">
-                  <FavButton slug={slug} name={tool.name} />
-                  <Link className="tool-top" href={`/tool/${slug}`}>
-                    <div className="tool-logo" style={{ background: tool.color }}>
-                      {tool.logo}
+                <div key={tool.slug} className="tool-card">
+                  <FavButton slug={tool.slug} name={tool.name} />
+                  <Link className="tool-top" href={`/tool/${tool.slug}`}>
+                    <div className="tool-logo">
+                      <ToolLogo logo={tool.logo} name={tool.name} color={tool.color} />
                     </div>
                     <div>
                       <div className="tool-name">{tool.name}</div>
@@ -384,16 +393,14 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="tool-grid">
-            {LATEST_TOOL_SLUGS.map((slug) => {
-              const tool = tools.find((t) => t.slug === slug);
-              if (!tool) return null;
+            {latestTools.map((tool) => {
               const sopCount = tool.paths.length;
               return (
-                <div key={slug} className="tool-card">
-                  <FavButton slug={slug} name={tool.name} />
-                  <Link className="tool-top" href={`/tool/${slug}`}>
-                    <div className="tool-logo" style={{ background: tool.color }}>
-                      {tool.logo}
+                <div key={tool.slug} className="tool-card">
+                  <FavButton slug={tool.slug} name={tool.name} />
+                  <Link className="tool-top" href={`/tool/${tool.slug}`}>
+                    <div className="tool-logo">
+                      <ToolLogo logo={tool.logo} name={tool.name} color={tool.color} />
                     </div>
                     <div>
                       <div className="tool-name">{tool.name}</div>

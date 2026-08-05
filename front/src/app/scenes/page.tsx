@@ -10,7 +10,6 @@ import {
   type Usage,
   type Cat,
   roleClass,
-  CAT_ORDER,
 } from "@/lib/content";
 import { Icon } from "@/lib/icons";
 
@@ -92,7 +91,7 @@ export default function ScenesPage() {
       <div className="scenes-layout">
         {/* Left Cat Nav */}
         <nav className="cat-nav">
-          {CAT_ORDER.map((catKey, idx) => {
+          {Object.keys(categories).map((catKey, idx) => {
             const cat = categories[catKey];
             if (!cat) return null;
             return (
@@ -121,7 +120,7 @@ export default function ScenesPage() {
             <span className="muted">· 切换上方角色可筛选场景</span>
           </div>
 
-          {CAT_ORDER.map((catKey, idx) => {
+          {Object.keys(categories).map((catKey, idx) => {
             const cat = categories[catKey];
             if (!cat) return null;
             const catScenes = scenes.filter(

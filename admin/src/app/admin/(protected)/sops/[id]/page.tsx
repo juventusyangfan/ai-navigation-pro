@@ -198,7 +198,7 @@ export default function SopEditor() {
       <div className="sop-editor">
         {/* 左：路径列表 */}
         <div className="card path-list">
-          <div className="nav-group" style={{ padding: "0 4px" }}>全部路径</div>
+          <div className="nav-group">全部路径</div>
           {list.map((p) => (
             <Link
               key={p.id}
@@ -333,7 +333,7 @@ export default function SopEditor() {
 
         {/* 右：实时预览（admin 内简化版，结构对齐前台 SopPathView） */}
         <div className="card preview">
-          <div className="nav-group" style={{ padding: "0 4px" }}>实时预览（前台效果近似）</div>
+          <div className="nav-group">实时预览（前台效果近似）</div>
           <h3 style={{ marginTop: 4 }}>{meta.title || "未命名路径"}</h3>
           {meta.summary && <p style={{ color: "var(--muted)", marginTop: 0 }}>{meta.summary}</p>}
           <div style={{ fontSize: 12, color: "var(--muted)" }}>

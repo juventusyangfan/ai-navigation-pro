@@ -38,6 +38,9 @@ export async function POST(req: Request) {
   const tool = await db.tool.findUnique({ where: { id: b.toolId } });
   if (!tool) return fail(404, "工具不存在");
   const order = await db.sopPath.count({ where: { toolId: b.toolId } });
+  // 自动继承关联工具的首个 scene/subj（可在编辑时覆盖），生成唯一 usageId
+  const toolScenes: string[] = JSON.parse(tool.scenes);
+  const toolSubjects: string[] = JSON.parse(tool.subjects);
   const path = await db.sopPath.create({
     data: {
       toolId: b.toolId,
@@ -46,7 +49,10 @@ export async function POST(req: Request) {
       estMinutes: b.estMinutes ?? null,
       level: b.level ?? null,
       forRole: b.forRole ?? null,
+      scene: b.scene ?? toolScenes[0] ?? null,
+      subj: b.subj ?? toolSubjects[0] ?? null,
       isLibraryPick: !!b.isLibraryPick,
+      usageId: b.usageId ?? crypto.randomUUID(),
       order,
     },
   });

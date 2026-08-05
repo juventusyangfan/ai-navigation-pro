@@ -1,24 +1,122 @@
-// 教AI导航 · 采集块（agent 自动收集，人工补 SOP）
-// -----------------------------------------------------------------------------
-// 来源：扮演"采集 agent"，对公开可访问的 K12 教育 AI 产品做一轮盘点。
-// 每条均经 WebSearch 核实官方 URL（2026-08-04）。
-// 信任分级（见 memory 2026-08-04「数据来源方案修订」）：
-//   - agent 填写：name / url / tagline / platform / pricing / scenes / subjects / roles / alts / pros / cons
-//   - agent 填写（场景推导）：compliance —— 按 scenes/roles 推导的「使用合规护栏」，
-//       与 front/data.ts 中 12 条 curated 工具同一口径（隐私/适龄/版权/退费等提示），非公司法律资质。
-//   - 占位（留待人工）：logo（首字）、color（品牌色近似）、rating=0（未评）
-//   - status 由 seed.ts 统一置 "draft"（软闸，未人工审核不公开）
-// 分类纪律：scenes/subjects/roles 严格锁死 front/data.ts 的已知枚举（8 scene / 4 role），
-//           任何 agent 自创分类一律丢弃，否则会断前端筛选。
-// paths:[] —— 采集阶段只落产品事实，SOP 由人工基于工具后续编辑。
-// -----------------------------------------------------------------------------
-import type { Tool } from "../../front/src/lib/data";
+// 教AI导航 · 全站单一数据源
+// 由原型 design/generate.js 移植，所有页面均从此处取数。
 
-export const COLLECTED_TOOLS: Tool[] = [
+export type Role = "老师" | "学生" | "家长" | "学校管理员";
+export type Pricing = "Free" | "Freemium" | "Paid" | "Enterprise";
+export type Level = "入门" | "进阶" | "熟练";
+
+export interface Cat {
+  icon: string;
+  phase: string;
+  desc: string;
+}
+
+export interface Scene {
+  key: string;
+  name: string;
+  cat: string;
+  icon: string;
+  roles: Role[];
+}
+
+export interface Step {
+  /** 这一步要达到的目标 / 意图（先懂为什么再做） */
+  goal?: string;
+  /** 动作描述 */
+  action: string;
+  /** 可直接复制的提示词，写死的具体内容用 {{变量}} 占位 */
+  prompt: string;
+  /** 示例产出：一小段脱敏的真实 AI 返回样例，让用户知道“做成什么样算对” */
+  outputSample: string;
+  media?: { type: "image" | "video" | "file"; label: string };
+  /** 避坑：常见错误 / 合规红线（红框） */
+  pitfall?: string;
+  /** 技巧：正向提效建议（绿框） */
+  tip?: string;
+  /** 决策分支：遇到某情况时建议怎么走（紫框） */
+  branch?: { when: string; then: string }[];
+}
+
+export interface Path {
+  title: string;
+  /** 一句话摘要，显示在路径卡上，帮用户快速判断要不要点 */
+  summary?: string;
+  /** 预计耗时（分钟） */
+  estMinutes?: number;
+  /** 难度：入门 / 进阶 / 熟练 */
+  level?: Level;
+  /** 适用角色 */
+  forRole?: Role;
+  /** 关联的用法库条目 id（打通社会证明与互链） */
+  usageId?: string;
+  steps: Step[];
+}
+
+export interface Tool {
+  slug: string;
+  name: string;
+  logo: string;
+  color: string;
+  tagline: string;
+  url: string;
+  roles: Role[];
+  scenes: string[];
+  subjects: string[];
+  pricing: Pricing;
+  platform: string;
+  rating: number;
+  pros: string[];
+  cons: string[];
+  compliance: string;
+  alts: string[];
+  paths: Path[];
+}
+
+export interface Usage {
+  id: string;
+  title: string;
+  scene: string;
+  role: Role;
+  subj: string;
+  tool: string;
+  toolName?: string;
+  pick: boolean;
+  useful: number;
+  collect: number;
+  steps: number;
+  summary: string;
+}
+
+/* ---------------- 分类（教学全流程） ---------------- */
+export const CATS: Record<string, Cat> = {
+  教学准备: { icon: "Compass", phase: "课前", desc: "上课前：备课规划、资源搜集与课堂导入设计" },
+  课堂教学: { icon: "PaintBrush", phase: "课中", desc: "在课堂：课件制作、综合实践与课堂互动生成" },
+  评价协同: { icon: "ChartBar", phase: "课后", desc: "下课后：作业考试、学情评价与家校沟通协同" },
+  成长教研: { icon: "BookOpen", phase: "发展", desc: "长期成长：自学答疑、教研课题与专业发展" },
+};
+
+/* ---------------- 8 个教学场景 ---------------- */
+export const SCENES: Scene[] = [
+  { key: "beikeguihua", name: "备课规划", cat: "教学准备", icon: "Notepad", roles: ["老师"] },
+  { key: "kejian", name: "课件制作", cat: "课堂教学", icon: "PaintBrush", roles: ["老师"] },
+  { key: "zuoye", name: "作业考试", cat: "评价协同", icon: "ClipboardText", roles: ["老师", "学生"] },
+  { key: "xueqing", name: "学情评价", cat: "评价协同", icon: "ChartLineUp", roles: ["老师", "家长"] },
+  { key: "jiaxiao", name: "家校班级", cat: "评价协同", icon: "ChatsCircle", roles: ["老师", "家长"] },
+  { key: "zixue", name: "自学答疑", cat: "成长教研", icon: "BookOpen", roles: ["学生", "老师"] },
+  { key: "keti", name: "教研课题", cat: "成长教研", icon: "Flask", roles: ["老师", "学生"] },
+  { key: "shijian", name: "综合实践", cat: "课堂教学", icon: "PuzzlePiece", roles: ["老师", "学生"] },
+];
+
+export const SCENE_NAME: Record<string, string> = Object.fromEntries(
+  SCENES.map((s) => [s.key, s.name]),
+);
+
+/* ---------------- 12 个工具 ---------------- */
+export const TOOLS: Tool[] = [
   {
     slug: "doubao",
     name: "豆包",
-    logo: "豆",
+    logo: "https://doubao.com/favicon.ico",
     color: "#2f6bff",
     tagline: "字节跳动出品的中文全能 AI 助手",
     url: "https://doubao.com",
@@ -85,7 +183,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "deepseek",
     name: "DeepSeek",
-    logo: "DS",
+    logo: "https://deepseek.com/favicon.ico",
     color: "#4d6bfe",
     tagline: "深度推理大模型，擅长逻辑与解题",
     url: "https://deepseek.com",
@@ -171,7 +269,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "glm",
     name: "智谱 GLM",
-    logo: "GLM",
+    logo: "https://zhipuai.cn/favicon.ico",
     color: "#7c3aed",
     tagline: "国产大模型，文档与 Agent 能力强",
     url: "https://zhipuai.cn",
@@ -219,7 +317,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "kimi",
     name: "Kimi",
-    logo: "Ki",
+    logo: "https://kimi.moonshot.cn/favicon.ico",
     color: "#0ea5e9",
     tagline: "超长上下文，擅长读文献与整理",
     url: "https://kimi.moonshot.cn",
@@ -267,7 +365,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "mistral",
     name: "秘塔写作猫",
-    logo: "秘",
+    logo: "https://xiezuocat.com/favicon.ico",
     color: "#0d9488",
     tagline: "中文纠错与润色，批改好帮手",
     url: "https://xiezuocat.com",
@@ -306,7 +404,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "bishun",
     name: "笔神",
-    logo: "笔",
+    logo: "https://bishun.com/favicon.ico",
     color: "#db2777",
     tagline: "面向学生的 AI 作文辅导",
     url: "https://bishun.com",
@@ -345,7 +443,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "gamma",
     name: "Gamma",
-    logo: "G",
+    logo: "https://gamma.app/favicon.ico",
     color: "#f59e0b",
     tagline: "一句话生成精美演示文稿",
     url: "https://gamma.app",
@@ -394,7 +492,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "canva",
     name: "Canva",
-    logo: "C",
+    logo: "https://canva.com/favicon.ico",
     color: "#e11d48",
     tagline: "海量模板的视觉设计工具",
     url: "https://canva.com",
@@ -431,7 +529,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "jianying",
     name: "剪映",
-    logo: "剪",
+    logo: "https://capcut.cn/favicon.ico",
     color: "#111827",
     tagline: "全民易用的视频剪辑与 AI 成片",
     url: "https://capcut.cn",
@@ -480,7 +578,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "wenxin",
     name: "文心一言",
-    logo: "文",
+    logo: "https://yiyan.baidu.com/favicon.ico",
     color: "#2563eb",
     tagline: "百度大模型，中文知识广",
     url: "https://yiyan.baidu.com",
@@ -518,7 +616,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "tongyi",
     name: "通义千问",
-    logo: "通",
+    logo: "https://tongyi.aliyun.com/favicon.ico",
     color: "#0891b2",
     tagline: "阿里大模型，答疑与多模态",
     url: "https://tongyi.aliyun.com",
@@ -561,7 +659,7 @@ export const COLLECTED_TOOLS: Tool[] = [
   {
     slug: "wenku",
     name: "文库 AI",
-    logo: "库",
+    logo: "https://wenku.baidu.com/favicon.ico",
     color: "#475569",
     tagline: "百度文库 AI，资料与总结",
     url: "https://wenku.baidu.com",
@@ -597,573 +695,169 @@ export const COLLECTED_TOOLS: Tool[] = [
     ],
   },
   {
-    slug: "banjiyouhua",
-    name: "班级优化大师",
-    logo: "班",
-    color: "#00b386",
-    tagline: "希沃出品，AI 班级管理与学情看板",
-    url: "https://care.seewo.com",
-    roles: ["老师", "家长"],
-    scenes: ["jiaxiao", "xueqing"],
-    subjects: ["综合"],
-    pricing: "Free",
-    platform: "APP / 网页 / 大屏",
-    rating: 0,
-    pros: ["与希沃硬件打通", "考勤与行为数据可视化", "家长端同步"],
-    cons: ["强绑定希沃生态", "高阶分析需学校开通"],
-    compliance: "家校沟通话术需教师把关；班级与学情数据注意学生隐私，不公开排名。",
-    alts: ["xiaobao", "xiaohe"],
-    paths: [],
-  },
-  {
-    slug: "huohua",
-    name: "火花思维",
-    logo: "火",
-    color: "#ff6a00",
-    tagline: "在线数学思维训练，动画化互动课",
-    url: "https://www.huohua.cn",
-    roles: ["学生"],
-    scenes: ["zixue", "shijian"],
-    subjects: ["数学"],
-    pricing: "Paid",
-    platform: "APP / 网页",
-    rating: 0,
-    pros: ["思维可视化强", "小班直播互动", "关卡式进阶"],
-    cons: ["偏数理，学科覆盖窄", "付费门槛较高"],
-    compliance: "课程适龄，家长合理规划学习节奏；低龄避免过长时间屏幕学习。",
-    alts: ["songshuai", "yangcong"],
-    paths: [],
-  },
-  {
-    slug: "zhangmen",
-    name: "掌门1对1",
-    logo: "掌",
-    color: "#ff5a5f",
-    tagline: "中小学 1 对 1 在线辅导",
-    url: "http://www.zhangmen.com/",
-    roles: ["学生", "家长"],
-    scenes: ["zuoye", "zixue"],
-    subjects: ["综合"],
-    pricing: "Paid",
-    platform: "APP / 网页",
-    rating: 0,
-    pros: ["师资可选", "个性化排课", "家长可旁听"],
-    cons: ["客单价高", "师资质量参差"],
-    compliance: "选择持证师资；理性购课，看清退费条款与合同细则。",
-    alts: ["yuanfudao", "gaotu"],
-    paths: [],
-  },
-  {
-    slug: "guangsuxie",
-    name: "光速写作",
-    logo: "光",
-    color: "#2f80ed",
-    tagline: "AI 写作与作文批改助手",
-    url: "https://guangsuxie.com/",
-    roles: ["学生", "老师"],
-    scenes: ["zuoye", "kejian"],
-    subjects: ["语文"],
-    pricing: "Freemium",
-    platform: "网页 / APP",
-    rating: 0,
-    pros: ["作文批改快", "思路启发", "可导出讲义"],
-    cons: ["需防学生直接代写", "深度润色需会员"],
-    compliance: "设置“启发而非代写”模式，避免学生直接复制成文；课件勿含真实学生信息。",
-    alts: ["bishun", "mistral"],
-    paths: [],
-  },
-  {
-    slug: "alfadan",
-    name: "阿尔法蛋",
-    logo: "蛋",
-    color: "#ff7a00",
-    tagline: "儿童 AI 学习硬件（词典笔/机器人）",
-    url: "https://www.toycloud.com/",
-    roles: ["学生", "家长"],
-    scenes: ["zixue"],
-    subjects: ["综合"],
-    pricing: "Paid",
-    platform: "硬件 + APP",
-    rating: 0,
-    pros: ["离线可用", "护眼护脊设计", "点读识别准"],
-    cons: ["硬件一次性投入", "内容更新依赖厂商"],
-    compliance: "硬件含适龄内容，家长管控使用时长；语音交互注意儿童隐私。",
-    alts: ["readboy", "youxuepai"],
-    paths: [],
-  },
-  {
-    slug: "readboy",
-    name: "读书郎",
-    logo: "读",
-    color: "#e60012",
-    tagline: "AI 学习机与智慧课堂硬件",
-    url: "https://www.readboy.com/",
-    roles: ["学生", "家长"],
-    scenes: ["zixue"],
-    subjects: ["综合"],
-    pricing: "Paid",
-    platform: "硬件 + APP",
-    rating: 0,
-    pros: ["同步教材资源多", "家长管控到位", "护眼屏"],
-    cons: ["硬件成本较高", "系统相对封闭"],
-    compliance: "学习机内容适龄；家长设定使用时长，避免沉迷。",
-    alts: ["youxuepai", "alfadan"],
-    paths: [],
-  },
-  {
-    slug: "youxuepai",
-    name: "优学派",
-    logo: "优",
-    color: "#1677ff",
-    tagline: "AI 学生平板与精准学系统",
-    url: "https://www.youxuepai.com/",
-    roles: ["学生"],
-    scenes: ["zixue"],
-    subjects: ["综合"],
-    pricing: "Paid",
-    platform: "硬件 + APP",
-    rating: 0,
-    pros: ["AI 精准学路径", "题库同步教材", "家长端报告"],
-    cons: ["硬件绑定", "增值内容付费"],
-    compliance: "内容适龄；家长管控时长，保护视力与作息。",
-    alts: ["readboy", "iflytekpad"],
-    paths: [],
-  },
-  {
-    slug: "jiazhangbang",
-    name: "家长帮",
-    logo: "长",
-    color: "#ff8c00",
-    tagline: "K12 家长社区与升学资讯",
-    url: "http://www.jzb.com/",
-    roles: ["家长"],
-    scenes: ["jiaxiao"],
-    subjects: ["综合"],
-    pricing: "Free",
-    platform: "网页 / APP",
-    rating: 0,
-    pros: ["经验帖丰富", "政策解读及时", "免费"],
-    cons: ["广告较多", "信息需甄别"],
-    compliance: "社区交流勿泄露孩子真实身份与学校信息；甄别招生广告。",
-    alts: ["xiaobao", "banjiyouhua"],
-    paths: [],
-  },
-  {
-    slug: "xiaobao",
-    name: "校宝在线",
-    logo: "宝",
-    color: "#1e88e5",
-    tagline: "教育 SaaS 与智慧校园管理",
-    url: "https://www.xiaobaoonline.com/",
-    roles: ["老师", "学校管理员"],
-    scenes: ["jiaxiao", "xueqing"],
-    subjects: ["综合"],
-    pricing: "Enterprise",
-    platform: "SaaS / 网页",
-    rating: 0,
-    pros: ["排课/家校/收费一体化", "机构与学校双场景", "数据看板"],
-    cons: ["面向机构采购", "个人家长难直接用"],
-    compliance: "校园数据须脱敏；家校通知话术统一审核后发送。",
-    alts: ["banjiyouhua"],
-    paths: [],
-  },
-  {
-    slug: "banma",
-    name: "斑马AI课",
-    logo: "斑",
-    color: "#ffd400",
-    tagline: "猿辅导旗下 AI 启蒙课程",
-    url: "https://banmaaike.com",
-    roles: ["学生", "家长"],
-    scenes: ["zixue", "shijian"],
-    subjects: ["综合"],
-    pricing: "Paid",
-    platform: "APP",
-    rating: 0,
-    pros: ["低龄启蒙体系完整", "动画互动强", "AI 纠音"],
-    cons: ["偏低龄", "续费压力"],
-    compliance: "启蒙内容适龄；家长陪伴使用，控制屏幕时间。",
-    alts: ["guagualong", "ihuman"],
-    paths: [],
-  },
-  {
-    slug: "xiaohe",
-    name: "小盒科技",
-    logo: "盒",
-    color: "#ff6b35",
-    tagline: "AI 作业与智能练习平台",
-    url: "https://hixiaohe.cn/",
-    roles: ["老师", "学生", "家长"],
-    scenes: ["zuoye", "xueqing"],
-    subjects: ["数学"],
-    pricing: "Freemium",
-    platform: "APP / 网页 / 硬件",
-    rating: 0,
-    pros: ["作业自动批改", "学情报告三方可见", "覆盖校内同步"],
-    cons: ["部分功能付费", "依赖学校部署"],
-    compliance: "作业与学情数据仅用于教学改进；向学生/家长展示时注意隐私。",
-    alts: ["zuoyebang", "kuaidui"],
-    paths: [],
-  },
-  {
-    slug: "songshuai",
-    name: "松鼠AI",
-    logo: "鼠",
-    color: "#6a5acd",
-    tagline: "智适应学习系统（AI 一对一）",
-    url: "https://www.songshuai.com",
-    roles: ["学生"],
-    scenes: ["zixue", "xueqing"],
-    subjects: ["数学"],
-    pricing: "Paid",
-    platform: "APP / 网页 / 门店",
-    rating: 0,
-    pros: ["知识点级诊断", "个性化推题", "学习路径清晰"],
-    cons: ["门店模式重", "学科以数理为主"],
-    compliance: "自适应内容需教师定期复核进度；避免过度依赖系统诊断。",
-    alts: ["huohua", "yangcong"],
-    paths: [],
-  },
-  {
     slug: "yangcong",
     name: "洋葱学园",
-    logo: "葱",
-    color: "#ff6b6b",
-    tagline: "动画微课与 AI 学伴",
+    logo: "https://yangcongxueyuan.com/favicon.ico",
+    color: "#ff6a00",
+    tagline: "K12 动画微课平台，用可视化把知识点讲透",
     url: "https://yangcongxueyuan.com",
     roles: ["学生", "老师"],
-    scenes: ["zixue"],
-    subjects: ["数学"],
+    scenes: ["zixue", "kejian", "beikeguihua"],
+    subjects: ["数学", "物理", "化学", "生物", "语文", "英语"],
     pricing: "Freemium",
-    platform: "APP / 网页",
-    rating: 0,
-    pros: ["知识点动画讲解直观", "校内同步好", "老师可布置"],
-    cons: ["深度题需会员", "偏理科"],
-    compliance: "微课作为辅学，教师须结合课堂；引用数据请核对。",
-    alts: ["songshuai", "huohua"],
-    paths: [],
-  },
-  {
-    slug: "koolearn",
-    name: "新东方在线",
-    logo: "新",
-    color: "#e4002b",
-    tagline: "新东方网课与备考平台",
-    url: "https://www.koolearn.com",
-    roles: ["学生"],
-    scenes: ["zixue"],
-    subjects: ["综合"],
-    pricing: "Paid",
-    platform: "APP / 网页",
-    rating: 0,
-    pros: ["名师资源多", "备考体系成熟", "品牌背书"],
-    cons: ["大班为主", "客单价较高"],
-    compliance: "选课看清师资与退费规则；网课内容注意版权。",
-    alts: ["xueersi", "gaotu"],
-    paths: [],
-  },
-  {
-    slug: "tipaipai",
-    name: "题拍拍",
-    logo: "题",
-    color: "#ffcd00",
-    tagline: "拍照搜题与解题视频",
-    url: "https://tipaipai.com/",
-    roles: ["学生", "家长", "老师"],
-    scenes: ["zuoye"],
-    subjects: ["数学"],
-    pricing: "Freemium",
-    platform: "APP",
-    rating: 0,
-    pros: ["拍照秒出解析", "视频讲解覆盖率高", "免费额度足"],
-    cons: ["易诱发抄答案", "需引导讲思路"],
-    compliance: "提供解题思路而非直接答案，避免助长抄作业；学生数据勿外传。",
-    alts: ["zuoyebang", "kuaidui"],
-    paths: [],
-  },
-  {
-    slug: "kuaidui",
-    name: "快对",
-    logo: "快",
-    color: "#00c2a8",
-    tagline: "作业检查与 AI 答疑",
-    url: "https://www.kuaiduizuoye.com/",
-    roles: ["学生", "家长", "老师"],
-    scenes: ["zuoye"],
-    subjects: ["综合"],
-    pricing: "Freemium",
-    platform: "APP",
-    rating: 0,
-    pros: ["整本教辅核对", "AI 答疑快", "覆盖学科广"],
-    cons: ["解析质量参差", "部分付费"],
-    compliance: "作业检查用于纠错辅导，非代做；隐私数据优先本地处理。",
-    alts: ["tipaipai", "zuoyebang"],
-    paths: [],
-  },
-  {
-    slug: "xueersi",
-    name: "学而思网校",
-    logo: "思",
-    color: "#ff7a00",
-    tagline: "好未来旗下 K12 素养与网课",
-    url: "https://www.xueersi.com/",
-    roles: ["学生"],
-    scenes: ["zixue", "shijian"],
-    subjects: ["综合"],
-    pricing: "Paid",
-    platform: "APP / 网页 / 学习机",
-    rating: 0,
-    pros: ["教研沉淀深", "素养+学科并重", "学习机生态"],
-    cons: ["正价课为主", "续报压力"],
-    compliance: "选课核对师资与退费；网课内容版权归机构所有。",
-    alts: ["koolearn", "gaotu"],
-    paths: [],
-  },
-  {
-    slug: "zuoyebang",
-    name: "作业帮",
-    logo: "帮",
-    color: "#ff6a00",
-    tagline: "AI 学习神器：搜题/批改/同步",
-    url: "https://www.zuoyebang.com/",
-    roles: ["学生", "家长", "老师"],
-    scenes: ["zuoye", "zixue"],
-    subjects: ["综合"],
-    pricing: "Freemium",
-    platform: "APP / 网页",
-    rating: 0,
-    pros: ["19 亿题库", "AI 秒批作业", "写作与同步"],
-    cons: ["易依赖搜答案", "增值功能付费"],
-    compliance: "搜题用于查漏补缺，建议启发式讲解；学生隐私不上云外传。",
-    alts: ["tipaipai", "kuaidui"],
-    paths: [],
-  },
-  {
-    slug: "yuanfudao",
-    name: "猿辅导",
-    logo: "猿",
-    color: "#ff7a00",
-    tagline: "AI 双师直播课与智能练习",
-    url: "https://yuanfudao.com",
-    roles: ["学生"],
-    scenes: ["zixue"],
-    subjects: ["综合"],
-    pricing: "Paid",
-    platform: "APP / 网页",
-    rating: 0,
-    pros: ["AI 沉浸式课堂", "诊断式规划", "品牌强"],
-    cons: ["正价课为主", "排课灵活度一般"],
-    compliance: "理性购课注意退费；直播内容适龄。",
-    alts: ["gaotu", "xueersi"],
-    paths: [],
-  },
-  {
-    slug: "gaotu",
-    name: "高途",
-    logo: "途",
-    color: "#2d8cf0",
-    tagline: "名师直播课与 1 对 1 规划",
-    url: "https://www.gaotu.cn",
-    roles: ["学生"],
-    scenes: ["zixue"],
-    subjects: ["综合"],
-    pricing: "Paid",
-    platform: "APP / 网页",
-    rating: 0,
-    pros: ["名师阵容强", "1 对 1 规划", "素养+应试"],
-    cons: ["正价课为主", "退费规则需看清"],
-    compliance: "选课看清师资与退费条款；避免营销冲动消费。",
-    alts: ["xueersi", "yuanfudao"],
-    paths: [],
-  },
-  {
-    slug: "youdao",
-    name: "网易有道",
-    logo: "道",
-    color: "#d7282f",
-    tagline: "子曰大模型驱动的全家桶学习工具",
-    url: "https://www.youdao.com",
-    roles: ["学生", "老师"],
-    scenes: ["zuoye", "zixue"],
-    subjects: ["英语"],
-    pricing: "Freemium",
-    platform: "APP / 硬件 / 网页",
-    rating: 0,
-    pros: ["词典笔国民级", "有道小P AI 全科助手", "子曰大模型落地早"],
-    cons: ["硬件与会员分开付费", "功能分散在多 App"],
-    compliance: "翻译/词典结果需核对；作文批改建议启发而非代写。",
-    alts: ["tongyi", "kimi"],
-    paths: [],
-  },
-  {
-    slug: "iflytekpad",
-    name: "讯飞AI学习机",
-    logo: "讯",
-    color: "#1a73e8",
-    tagline: "星火大模型驱动的 1 对 1 精准学",
-    url: "https://edu.iflytek.com/solution/family/learning-pad",
-    roles: ["学生"],
-    scenes: ["zixue", "xueqing"],
-    subjects: ["综合"],
-    pricing: "Paid",
-    platform: "硬件 + APP",
-    rating: 0,
-    pros: ["星火大模型精准学", "AI 1对1 答疑", "护眼屏认证"],
-    cons: ["硬件成本高", "增值内容付费"],
-    compliance: "硬件内容适龄；家长管控时长；学情报告教师复核。",
-    alts: ["youxuepai", "readboy"],
-    paths: [],
-  },
-  {
-    slug: "seewoban",
-    name: "希沃白板",
-    logo: "沃",
-    color: "#00b386",
-    tagline: "互动教学与课件制作神器",
-    url: "https://easinote.seewo.com/",
-    roles: ["老师"],
-    scenes: ["kejian", "beikeguihua"],
-    subjects: ["综合"],
-    pricing: "Free",
-    platform: "客户端 / 网页",
-    rating: 0,
-    pros: ["云课件互通", "学科工具丰富", "课堂活动模板多"],
-    cons: ["偏教师端", "高级素材付费"],
-    compliance: "课件中勿出现真实学生信息；导出后请人工核对事实。",
-    alts: ["gamma", "canva"],
-    paths: [],
-  },
-  {
-    slug: "guagualong",
-    name: "瓜瓜龙",
-    logo: "瓜",
-    color: "#ff8a00",
-    tagline: "字节旗下多学科 AI 启蒙",
-    url: "https://www.ggl.cn",
-    roles: ["学生"],
-    scenes: ["zixue", "shijian"],
-    subjects: ["英语"],
-    pricing: "Paid",
-    platform: "APP",
-    rating: 0,
-    pros: ["英语/思维/语文多学科", "AI 录播课", "北美外教"],
-    cons: ["偏低龄", "续费压力"],
-    compliance: "启蒙内容适龄；业务调整期请确认服务可用性再购课。",
-    alts: ["banma", "ihuman"],
-    paths: [],
-  },
-  {
-    slug: "ihuman",
-    name: "洪恩",
-    logo: "恩",
-    color: "#ff5a5f",
-    tagline: "纽交所上市儿童启蒙品牌",
-    url: "https://www.ihuman.com",
-    roles: ["学生"],
-    scenes: ["zixue", "shijian"],
-    subjects: ["语文"],
-    pricing: "Freemium",
-    platform: "APP / 硬件",
-    rating: 0,
-    pros: ["识字/拼音/思维体系全", "牛津树分级阅读", "内容精致"],
-    cons: ["内容分散多 App", "部分付费"],
-    compliance: "内容适龄；家长陪伴，控制屏幕时间。",
-    alts: ["guagualong", "banma"],
-    paths: [],
-  },
-  {
-    slug: "codemao",
-    name: "编程猫",
-    logo: "猫",
-    color: "#ffcf00",
-    tagline: "青少年编程与 AI 编创教育",
-    url: "https://www.codemao.cn/",
-    roles: ["学生"],
-    scenes: ["shijian", "keti", "zixue"],
-    subjects: ["编程"],
-    pricing: "Freemium",
-    platform: "APP / 网页 / 校园版",
-    rating: 0,
-    pros: ["图形化到 Python 全路径", "Kitten 融入 AI 功能", "赛事体系"],
-    cons: ["系统课付费", "需家长引导"],
-    compliance: "鼓励原创创作而非照搬；账号与作品注意安全。",
-    alts: ["hetao"],
-    paths: [],
-  },
-  {
-    slug: "hetao",
-    name: "核桃编程",
-    logo: "核",
-    color: "#ff7a00",
-    tagline: "AI 人机双师少儿编程",
-    url: "https://www.hetao101.com",
-    roles: ["学生"],
-    scenes: ["shijian", "zixue"],
-    subjects: ["编程"],
-    pricing: "Paid",
-    platform: "APP / 网页",
-    rating: 0,
-    pros: ["十级进阶体系", "AI 人机双师", "家长端学情反馈"],
-    cons: ["正价课为主", "续报压力"],
-    compliance: "项目式学习鼓励独立思考；注意账号隐私。",
-    alts: ["codemao"],
-    paths: [],
-  },
-  {
-    slug: "xiaoyuan",
-    name: "小猿口算",
-    logo: "算",
-    color: "#ff6a00",
-    tagline: "猿辅导旗下拍照秒批作业（小猿AI）",
-    url: "https://www.xiaoyuankousuan.com",
-    roles: ["学生", "家长", "老师"],
-    scenes: ["zuoye"],
-    subjects: ["数学"],
-    pricing: "Freemium",
-    platform: "APP",
-    rating: 0,
-    pros: ["口算识别准（99.9%+）", "全班作业一键批改", "免费额度足"],
-    cons: ["升级后功能分散", "需引导讲思路"],
-    compliance: "口算练习用于巩固，避免机械刷题；数据隐私注意。",
-    alts: ["tipaipai", "kuaidui"],
-    paths: [],
-  },
-  {
-    slug: "kaishu",
-    name: "凯叔讲故事",
-    logo: "凯",
-    color: "#ff8c00",
-    tagline: "0-12 岁高品质原创儿童内容",
-    url: "https://www.kaishustory.com/index.html",
-    roles: ["学生", "家长"],
-    scenes: ["zixue", "shijian"],
-    subjects: ["语文"],
-    pricing: "Freemium",
-    platform: "APP / 硬件 / 图书",
-    rating: 0,
-    pros: ["国学/名著/科普音频全", "分龄推荐", "家长信赖"],
-    cons: ["深度内容付费", "偏听读非互动"],
-    compliance: "音频内容适龄；低龄使用家长陪伴，控制时长。",
-    alts: ["ihuman", "guagualong"],
-    paths: [],
-  },
-  {
-    slug: "shaonian",
-    name: "少年得到",
-    logo: "少",
-    color: "#2f6fed",
-    tagline: "7-15 岁素养与表达力课程",
-    url: "https://www.igetcool.com/",
-    roles: ["学生"],
-    scenes: ["zixue"],
-    subjects: ["语文"],
-    pricing: "Freemium",
-    platform: "APP",
-    rating: 0,
-    pros: ["名师大家音频课", "泉灵的表达素养课", "通识拓展"],
-    cons: ["偏音频课", "系统性需自规划"],
-    compliance: "课程内容适龄；理性订阅，注意退费。",
-    alts: ["kaishu", "youdao"],
-    paths: [],
+    platform: "网页 / APP",
+    rating: 4.5,
+    pros: ["动画讲解直观易懂", "知识点覆盖全", "智能练习能举一反三"],
+    cons: ["部分精品内容需 VIP", "偏理科，文科资源较少"],
+    compliance: "动画微课需配合课堂讲解，避免学生只看不练；家长关注使用时长，保护视力与作息。",
+    alts: [],
+    paths: [
+      {
+        title: "用洋葱学园做知识点自学与查漏补缺",
+        summary: "精准学诊断漏洞 → 看动画微课理解 → 做智能练习巩固，自学闭环一次跑通。",
+        estMinutes: 20,
+        level: "入门",
+        forRole: "学生",
+        usageId: "u-onion-1",
+        steps: [
+          {
+            goal: "先定位年级与教材版本，让推荐和诊断更准",
+            action: "注册后选学段 / 学科 / 教材版本",
+            prompt: "在「我的」里依次选择：{{年级}} / {{学科}} / {{教材版本（人教版 / 北师大版…）}}，保存后首页推荐会同步更新。",
+            outputSample: "已切换到 初二 · 数学 · 人教版，首页推荐与练习进度按此版本展开。",
+            tip: "教材版本选错会导致练习与校内进度不匹配，先和课本封面核对再选。",
+          },
+          {
+            goal: "用「精准学」找出薄弱点，而不是从头盲目看",
+            action: "进入精准学做知识点诊断",
+            prompt: "在「精准学」中选择{{当前章节}}开始诊断；完成后查看系统标红、未掌握的知识点。",
+            outputSample: "诊断结果：一元二次方程（已掌握 60%）、二次函数图像（已掌握 35%）——后者建议优先复习。",
+            tip: "先看标红项再决定看哪节微课，效率最高。",
+            pitfall: "不要把诊断结果当考试分数看，它只是定位薄弱点的参考。",
+          },
+          {
+            goal: "用动画把抽象概念讲透，建立直观理解",
+            action: "看对应知识点的动画微课",
+            prompt: "在「课程」中打开标红知识点对应的动画微课（每节 3–5 分钟），看到例题先暂停自己算一遍再继续。",
+            outputSample: "微课《二次函数图像与性质》：用抛球轨迹演示开口方向——a>0 向上、a<0 向下，一目了然。",
+            media: { type: "video", label: "动画微课示意（洋葱学园）" },
+            tip: "被动看完记忆浅，看到例题先暂停思考，再对比讲解。",
+          },
+          {
+            goal: "趁热打铁巩固，让系统推同类变式题",
+            action: "做配套智能练习",
+            prompt: "学完微课立即点「智能练习」，让系统基于本节推送 5–8 道由易到难的同类题。",
+            outputSample: "第 1–3 题基础（已掌握）；第 4 题易错点「符号方向」系统自动加推 2 道变式；第 5–6 题进阶。",
+            tip: "做错的题会被收进错题本并生成讲解，别急着跳过。",
+            pitfall: "避免一错就点「看答案」，先想 30 秒，否则练了也白练。",
+          },
+          {
+            goal: "周期性复盘，把漏洞真正补上",
+            action: "看学情报告 + 复习错题本",
+            prompt: "每周在「学情报告」查看掌握率趋势；把错题本里反复错的题加入「复习计划」。",
+            outputSample: "本周掌握率 35%→58%；二次函数图像已从「薄弱」升为「达标」。",
+            branch: [
+              { when: "临近考试", then: "用「复习计划」按遗忘曲线每天推 10 题，考前两周集中刷标红项" },
+              { when: "某知识点反复错", then: "回到看微课一步重看 + 加做智能练习，直到掌握率 ≥ 80%" },
+            ],
+            tip: "把学情报告截图发家长 / 老师，沟通更有依据。",
+          },
+        ],
+      },
+      {
+        title: "用洋葱学园微课做课堂导入与备课资源",
+        summary: "把动画微课当课堂导入 / 难点演示，难点秒懂，备课省时。",
+        estMinutes: 10,
+        level: "入门",
+        forRole: "老师",
+        usageId: "u-onion-2",
+        steps: [
+          {
+            goal: "找到和本节对应的动画资源，避免现场临时找",
+            action: "在「课程」按知识点检索微课",
+            prompt: "搜索{{年级}}{{学科}}的{{知识点}}动画微课，预览确认时长与讲解口径适合本班后再收藏。",
+            outputSample: "找到《勾股定理》《浮力》等微课，单节 3–5 分钟，含生活化导入。",
+            tip: "提前下载 / 收藏，课堂网络不稳也能放。",
+          },
+          {
+            goal: "用微课做难点突破，比纯口述更直观",
+            action: "课堂播放难点动画 + 暂停追问",
+            prompt: "讲{{难点}}前播放对应动画约 1 分钟，播完立即提问：「为什么开口向下？」引导学生观察。",
+            outputSample: "学生从「听不懂」变成「哦～原来是这样」，课堂互动明显增多。",
+            pitfall: "微课是辅助，别整节课放视频；播放后必须有教师追问与练习衔接。",
+            tip: "把微课当「导入 + 演示」，讲评仍由老师主导。",
+          },
+          {
+            goal: "把自学任务布置给学生，形成课内外闭环",
+            action: "布置对应微课 + 练习",
+            prompt: "课后在班级群 / 作业里布置：观看{{知识点}}微课 + 完成智能练习 5 题，明天课前抽查。",
+            outputSample: "学生端收到任务，完成度可在学情报告查看。",
+            tip: "配合「学情报告」抽查完成度，比口头催作业省力。",
+          },
+        ],
+      },
+    ],
   },
 ];
+
+export const TOOL_MAP: Record<string, Tool> = Object.fromEntries(
+  TOOLS.map((t) => [t.slug, t]),
+);
+
+export const USAGES: Usage[] = [
+  { id: "u1", title: "用豆包生成课堂导入（配图）", scene: "beikeguihua", role: "老师", subj: "综合", tool: "doubao", pick: true, useful: 128, collect: 64, steps: 2, summary: "情境提问 + AI 配图，3 分钟搞定一节课的开场。" },
+  { id: "u2", title: "用 DeepSeek 出一套初三数学期中卷", scene: "zuoye", role: "老师", subj: "数学", tool: "deepseek", pick: true, useful: 256, collect: 131, steps: 4, summary: "细目表 → 分层命题 → 评分标准，附合规卷首语。" },
+  { id: "u3", title: "用 Gamma 把大纲变课件", scene: "kejian", role: "老师", subj: "综合", tool: "gamma", pick: false, useful: 92, collect: 47, steps: 2, summary: "输入章节大纲，一键生成可导出 PPT 的精美课件。" },
+  { id: "u4", title: "用剪映做一节微课", scene: "shijian", role: "老师", subj: "综合", tool: "jianying", pick: false, useful: 73, collect: 39, steps: 2, summary: "图文成片 + 字幕精修，零基础产出短视频。" },
+  { id: "u5", title: "用秘塔写作猫润色评语", scene: "zuoye", role: "老师", subj: "综合", tool: "mistral", pick: false, useful: 58, collect: 22, steps: 1, summary: "把生硬草稿改成具体、鼓励性评语。" },
+  { id: "u6", title: "用 Kimi 整理长篇文献", scene: "keti", role: "老师", subj: "综合", tool: "kimi", pick: true, useful: 141, collect: 70, steps: 2, summary: "上传 PDF 出结构化卡片，多篇对比写综述。" },
+  { id: "u7", title: "用笔神帮学生改作文", scene: "zixue", role: "学生", subj: "语文", tool: "bishun", pick: false, useful: 64, collect: 28, steps: 1, summary: "启发式批改，保护原创而非代写。" },
+  { id: "u8", title: "用通义千问做英语答疑", scene: "zixue", role: "学生", subj: "英语", tool: "tongyi", pick: false, useful: 88, collect: 41, steps: 1, summary: "讲思路不讲答案，引导真正理解。" },
+  { id: "u9", title: "用智谱 GLM 写课题申报书", scene: "keti", role: "老师", subj: "综合", tool: "glm", pick: false, useful: 77, collect: 35, steps: 2, summary: "标准框架 + 逐节扩写，学术规范需把关。" },
+  { id: "u-onion-1", title: "用洋葱学园做知识点自学与查漏补缺", scene: "zixue", role: "学生", subj: "数学", tool: "yangcong", pick: true, useful: 0, collect: 0, steps: 5, summary: "精准学诊断漏洞 → 看动画微课 → 做智能练习，自学闭环一次跑通。" },
+  { id: "u-onion-2", title: "用洋葱学园微课做课堂导入与备课资源", scene: "kejian", role: "老师", subj: "综合", tool: "yangcong", pick: false, useful: 0, collect: 0, steps: 3, summary: "把动画微课当课堂导入 / 难点演示，难点秒懂，备课省时。" },
+];
+
+/* ---------------- 角色 ---------------- */
+export const ROLES: Role[] = ["老师", "学生", "家长", "学校管理员"];
+
+export function roleClass(r: Role): "teacher" | "student" | "parent" | "admin" {
+  return r === "老师"
+    ? "teacher"
+    : r === "学生"
+      ? "student"
+      : r === "家长"
+        ? "parent"
+        : "admin";
+}
+
+/* ---------------- Helper ---------------- */
+export function getTool(slug: string): Tool | undefined {
+  return TOOL_MAP[slug];
+}
+export function getScene(key: string): Scene | undefined {
+  return SCENES.find((s) => s.key === key);
+}
+export function getUsage(id: string): Usage | undefined {
+  return USAGES.find((u) => u.id === id);
+}
+export function toolsByScene(key: string): Tool[] {
+  return TOOLS.filter((t) => t.scenes.includes(key));
+}
+export function usagesForScene(key: string): Usage[] {
+  return USAGES.filter((u) => u.scene === key);
+}
+export function usagesForTool(slug: string): Usage[] {
+  return USAGES.filter((u) => u.tool === slug);
+}
+export function pricingLabel(p: Pricing): string {
+  return p === "Free"
+    ? "免费"
+    : p === "Freemium"
+      ? "免费+增值"
+      : p === "Paid"
+        ? "付费"
+        : "企业版";
+}
+
+export const CAT_ORDER = Object.keys(CATS);

@@ -1,11 +1,8 @@
 // 教AI导航 · Admin 种子脚本
-// 直接复用 front 的 data.ts 作为唯一事实来源，导入到 admin 的 Prisma/SQLite。
+// 数据源为 seed-data.ts，导入到 admin 的 Prisma/SQLite。
 // 运行：npm run db:init  （prisma db push + 本脚本）
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-// 采集块：agent 自动收集的 K12 教育 AI 产品，以 draft 状态入库，待人工补 SOP 与审核
-import { COLLECTED_TOOLS } from "./collected-tools";
-// 相对路径指向兄弟目录 front 的 data.ts（纯 TS、无外部依赖，tsx 可直接 import）
 import {
   TOOLS,
   SCENES,
@@ -14,7 +11,7 @@ import {
   type Tool as FTool,
   type Path as FPath,
   type Step as FStep,
-} from "../../front/src/lib/data";
+} from "./seed-data";
 
 const db = new PrismaClient();
 
@@ -103,50 +100,6 @@ async function main() {
     }
   }
 
-  console.log("导入采集块（agent 自动收集 · draft 状态，待人工补 SOP）…");
-  for (const t of COLLECTED_TOOLS) {
-    await db.tool.upsert({
-      where: { slug: t.slug },
-      update: {
-        name: t.name,
-        logo: t.logo,
-        color: t.color,
-        tagline: t.tagline,
-        url: t.url,
-        roles: json(t.roles),
-        scenes: json(t.scenes),
-        subjects: json(t.subjects),
-        pricing: t.pricing,
-        platform: t.platform,
-        rating: t.rating,
-        pros: json(t.pros),
-        cons: json(t.cons),
-        compliance: t.compliance,
-        alts: json(t.alts),
-        status: "draft",
-      },
-      create: {
-        slug: t.slug,
-        name: t.name,
-        logo: t.logo,
-        color: t.color,
-        tagline: t.tagline,
-        url: t.url,
-        roles: json(t.roles),
-        scenes: json(t.scenes),
-        subjects: json(t.subjects),
-        pricing: t.pricing,
-        platform: t.platform,
-        rating: t.rating,
-        pros: json(t.pros),
-        cons: json(t.cons),
-        compliance: t.compliance,
-        alts: json(t.alts),
-        status: "draft",
-      },
-    });
-  }
-
   console.log("导入 RBAC 角色与权限…");
   const permMatrix: Record<string, { resource: string; action: string }[]> = {
     super_admin: [
@@ -216,7 +169,6 @@ async function main() {
 
   const counts = {
     tools: await db.tool.count(),
-    draft: await db.tool.count({ where: { status: "draft" } }),
     paths: await db.sopPath.count(),
     steps: await db.sopStep.count(),
     picks: await db.sopPath.count({ where: { isLibraryPick: true } }),

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import ToolLogo from "@/components/ToolLogo";
 
 interface FormState {
   slug: string;
@@ -156,8 +157,11 @@ export default function ToolEditor() {
           <input className="inp" value={form.slug} disabled={!isNew} onChange={(e) => set("slug", e.target.value)} />
         </label>
         <label className="field">
-          <span>logo 文字</span>
+          <span>Logo（图片 URL 或留空，留空则显示名称首字）</span>
           <input className="inp" value={form.logo} onChange={(e) => set("logo", e.target.value)} />
+          <span style={{ display: "inline-block", marginTop: 8 }}>
+            <ToolLogo logo={form.logo} name={form.name} color={form.color} size={32} />
+          </span>
         </label>
         <label className="field">
           <span>主题色</span>

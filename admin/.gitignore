@@ -1,7 +1,5 @@
 node_modules/
 .next/
 out/
-dev.db
-dev.db-journal
 *.log
 .env

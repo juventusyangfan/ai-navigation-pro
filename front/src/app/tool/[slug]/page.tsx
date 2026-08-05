@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
-  TOOL_MAP,
   roleClass,
   pricingLabel,
 } from "@/lib/content";
@@ -11,6 +10,7 @@ import FeedbackBox from "@/components/FeedbackBox";
 import StarRating from "@/components/StarRating";
 import ToolRating from "@/components/ToolRating";
 import { Icon } from "@/lib/icons";
+import ToolLogo from "@/components/ToolLogo";
 
 export async function generateStaticParams() {
   const toolMap = await content.getToolMap();
@@ -47,8 +47,8 @@ export default async function ToolPage({
       </div>
 
       <div className="detail-head">
-        <div className="detail-logo" style={{ background: t.color }}>
-          {t.logo}
+        <div className="detail-logo">
+          <ToolLogo logo={t.logo} name={t.name} color={t.color} />
         </div>
         <div style={{ flex: 1 }}>
           <h1>{t.name}</h1>
@@ -100,8 +100,8 @@ export default async function ToolPage({
             {alts.length ? (
               alts.map((a) => (
                 <Link key={a.slug} href={`/tool/${a.slug}`} className="alt-tool">
-                  <div className="alt-logo" style={{ background: a.color }}>
-                    {a.logo}
+                  <div className="alt-logo">
+                    <ToolLogo logo={a.logo} name={a.name} color={a.color} />
                   </div>
                   <div>
                     <div className="alt-name">{a.name}</div>

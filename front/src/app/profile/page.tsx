@@ -5,6 +5,7 @@ import Link from "next/link";
 import { content, type Tool } from "@/lib/content";
 import type { NoteRecord } from "@/components/NoteBox";
 import { Icon } from "@/lib/icons";
+import ToolLogo from "@/components/ToolLogo";
 
 type User = { name: string; role: string; ts: number } | null;
 type Feedback = { tool: string; type: string; text: string; ts: number };
@@ -151,14 +152,13 @@ export default function ProfilePage() {
                   <div
                     className="tool-logo"
                     style={{
-                      background: t.color,
                       width: 40,
                       height: 40,
                       fontSize: 15,
                       flexShrink: 0,
                     }}
                   >
-                    {t.logo}
+                    <ToolLogo logo={t.logo} name={t.name} color={t.color} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h4>{t.name}</h4>

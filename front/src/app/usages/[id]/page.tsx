@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { TOOL_MAP, roleClass } from "@/lib/content";
+import { roleClass } from "@/lib/content";
 import { content } from "@/lib/content";
 import SopPathView from "@/components/SopPathView";
 import UsageUsefulCollect from "@/components/UsageUsefulCollect";
@@ -34,7 +34,7 @@ export default async function UsageDetailPage({
   const tool = toolMap[usage.tool];
   const sceneName = await content.getSceneName();
   const sceneLabel = sceneName[usage.scene] || usage.scene;
-  const path = tool?.paths.find((p) => p.usageId === usage.id);
+  const path = tool?.paths.find((p) => p.usageId === usage.id || (p as { id?: string }).id === usage.id);
 
   return (
     <main className="wrap py-8">
