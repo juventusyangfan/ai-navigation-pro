@@ -6,6 +6,7 @@ import { Tool, roleClass, pricingLabel, content } from "@/lib/content";
 import FavButton from "./FavButton";
 import StarRating from "./StarRating";
 import { Icon } from "@/lib/icons";
+import ToolLogo from "./ToolLogo";
 
 export default function ToolCard({ tool }: { tool: Tool }) {
   const [sceneName, setSceneName] = useState<Record<string, string>>({});
@@ -23,8 +24,8 @@ export default function ToolCard({ tool }: { tool: Tool }) {
     >
       <FavButton slug={tool.slug} name={tool.name} />
       <Link href={`/tool/${tool.slug}`} className="tool-top">
-        <div className="tool-logo" style={{ background: tool.color }}>
-          {tool.logo}
+        <div className="tool-logo">
+          <ToolLogo logo={tool.logo} name={tool.name} color={tool.color} />
         </div>
         <div>
           <div className="tool-name">{tool.name}</div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ToolLogo from "@/components/ToolLogo";
 
 interface ToolRow {
   id: string;
@@ -65,23 +66,8 @@ export default function ToolsPage() {
             {rows.map((t) => (
               <tr key={t.id}>
                 <td>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 22,
-                      height: 22,
-                      lineHeight: "22px",
-                      textAlign: "center",
-                      borderRadius: 6,
-                      color: "#fff",
-                      background: t.color,
-                      fontSize: 12,
-                      marginRight: 8,
-                    }}
-                  >
-                    {t.logo}
-                  </span>
-                  {t.name}
+                  <ToolLogo logo={t.logo} name={t.name} color={t.color} size={22} />
+                  <span style={{ marginLeft: 8 }}>{t.name}</span>
                 </td>
                 <td>
                   <code>{t.slug}</code>

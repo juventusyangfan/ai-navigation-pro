@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const path = await db.sopPath.findFirst({
-    where: { usageId: id },
+    where: { OR: [{ usageId: id }, { id }] },
     include: { steps: true, tool: true },
   });
   if (!path) return fail(404, "用法不存在");

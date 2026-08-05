@@ -6,8 +6,9 @@ import {
   SCENE_LABEL,
   type CollectProposal,
 } from "@/lib/collect/contract";
+import ToolLogo from "@/components/ToolLogo";
 
-type Row = CollectProposal & { include: boolean };
+type Row = CollectProposal & { include: boolean; pathCount?: number };
 
 const wrap: React.CSSProperties = { maxWidth: 960, margin: "0 auto", padding: 24 };
 const card: React.CSSProperties = {
@@ -37,13 +38,13 @@ const input: React.CSSProperties = {
 };
 
 export default function CollectPage() {
-  const [query, setQuery] = useState("采集面向初中数学的 AI 解题/辅导类产品");
-  const [count, setCount] = useState(8);
+  const [query, setQuery] = useState("采集关于“k12教育”的 AI 教学 / 作业 / 评测 / 家校沟通类工具");
+  const [count, setCount] = useState(10);
   const [sceneFilter, setSceneFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [err, setErr] = useState("");
-  const [result, setResult] = useState<{ upserted: number; rejected: string[] } | null>(null);
+  const [result, setResult] = useState<{ upserted: number; rejected: string[]; created: { slug: string; toolId: string; pathIds: string[] }[] } | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   async function runCollect() {
@@ -60,7 +61,7 @@ export default function CollectPage() {
       if (!res.ok) throw new Error(data?.error || "采集失败");
       const proposals: CollectProposal[] = data.proposals || [];
       if (proposals.length === 0) setErr("本轮未产出有效候选（可能全部未映射到已知场景，或 LLM 未返回）。");
-      setRows(proposals.map((p) => ({ ...p, include: true })));
+      setRows(proposals.map((p) => ({ ...p, include: true, pathCount: p.paths?.length ?? 0 })));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "采集失败");
     } finally {
@@ -81,7 +82,7 @@ export default function CollectPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "入库失败");
-      setResult({ upserted: data.upserted || 0, rejected: data.rejected || [] });
+      setResult({ upserted: data.upserted || 0, rejected: data.rejected || [], created: data.created || [] });
       setRows((rs) => rs.filter((r) => !r.include));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "入库失败");
@@ -158,11 +159,13 @@ export default function CollectPage() {
             <thead>
               <tr style={{ textAlign: "left", color: "#6b7280" }}>
                 <th style={th}>选</th>
+                <th style={th}>Logo</th>
                 <th style={th}>名称</th>
                 <th style={th}>slug（可改）</th>
                 <th style={th}>URL（可改）</th>
                 <th style={th}>角色 / 场景</th>
-                <th style={th}>URL</th>
+                <th style={th}>SOP</th>
+                <th style={th}>校验</th>
                 <th style={th}>合规护栏</th>
               </tr>
             </thead>
@@ -175,6 +178,9 @@ export default function CollectPage() {
                       checked={r.include}
                       onChange={(e) => updateRow(r.slug, { include: e.target.checked })}
                     />
+                  </td>
+                  <td style={td}>
+                    <ToolLogo logo={r.logo} name={r.name} color="#2f6bff" size={28} />
                   </td>
                   <td style={td}>{r.name}</td>
                   <td style={td}>
@@ -196,13 +202,16 @@ export default function CollectPage() {
                     <br />
                     <span style={{ color: "#6b7280" }}>{r.scenes.map((s) => SCENE_LABEL[s] || s).join("、")}</span>
                   </td>
+                  <td style={{ ...td, textAlign: "center", color: r.pathCount ? "#16a34a" : "#9ca3af" }}>
+                    {r.pathCount ?? 0} 条
+                  </td>
                   <td style={{ ...td, textAlign: "center" }}>
                     {r.urlVerified ? (
-                      <span style={{ color: "#16a34a" }}>✓</span>
+                      <span style={{ color: "#16a34a" }} title="URL 已验证">✓</span>
+                    ) : r.urlWarning ? (
+                      <span style={{ color: "#d97706" }} title={r.urlWarning}>⚠</span>
                     ) : (
-                      <span style={{ color: "#dc2626" }} title="未验证可达">
-                        ✗
-                      </span>
+                      <span style={{ color: "#dc2626" }} title="未验证可达">✗</span>
                     )}
                   </td>
                   <td style={{ ...td, color: "#6b7280" }}>{r.compliance}</td>
@@ -219,8 +228,36 @@ export default function CollectPage() {
           {result.rejected.length > 0 && (
             <div style={{ marginTop: 8, color: "#b91c1c" }}>跳过：{result.rejected.join("；")}</div>
           )}
+          {result.created.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {result.created.map((c) => (
+                <div key={c.slug} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, fontSize: 13 }}>
+                  <b>{c.slug}</b>
+                  {c.pathIds.length > 0 && (
+                    c.pathIds.map((pid) => (
+                      <a
+                        key={pid}
+                        href={`/admin/sops/${pid}`}
+                        style={{ color: "#2f6bff", textDecoration: "underline", cursor: "pointer" }}
+                      >
+                        编辑 SOP →
+                      </a>
+                    ))
+                  )}
+                  {c.pathIds.length === 0 && (
+                    <a
+                      href={`/admin/tools/${c.toolId}`}
+                      style={{ color: "#6b7280", textDecoration: "underline", cursor: "pointer" }}
+                    >
+                      去新建 SOP
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           <div style={{ marginTop: 6, color: "#6b7280", fontSize: 13 }}>
-            去「工具管理」补 logo / 评分、写 SOP，审核后翻 published。
+            logo 已自动抓取（若为 ⚠ 请核对 URL）；去「工具管理」核对评分 / 翻 published。
           </div>
         </div>
       )}

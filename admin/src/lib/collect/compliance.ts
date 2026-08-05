@@ -1,6 +1,6 @@
 // 教AI导航 · 采集中心 · compliance 纯规则推导
 // -----------------------------------------------------------------------------
-// 与 front/data.ts 中 12 条 curated 工具同一口径：compliance = 使用合规/隐私护栏提示，
+// 与 prisma/seed-data.ts 中 12 条 curated 工具同一口径：compliance = 使用合规/隐私护栏提示，
 // 不是公司法律资质。按 scenes/roles 推导，零 LLM 调用。
 import { SCENE_LABEL } from "./contract";
 

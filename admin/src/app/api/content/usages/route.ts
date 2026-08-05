@@ -11,7 +11,6 @@ export async function GET(req: Request) {
   const toolSlug = searchParams.get("tool");
 
   const picks = await db.sopPath.findMany({
-    where: { usageId: { not: null } },
     include: { steps: true, tool: true },
     orderBy: { order: "asc" },
   });

@@ -1,4 +1,4 @@
-// DB 行 → 前端 data.ts 形状的序列化器，保证 /api/content/* 与 front 的 content.ts 期望一致。
+// DB 行 → 前端 content.ts 形状的序列化器，保证 /api/content/* 与 front 的 content.ts 期望一致。
 import type { Tool, SopPath, SopStep } from "@prisma/client";
 
 const arr = (s: string): string[] => {
@@ -25,6 +25,7 @@ export function stepToApi(s: SopStep) {
 
 export function pathToApi(p: SopPath & { steps: SopStep[] }) {
   return {
+    id: p.id,
     title: p.title,
     summary: p.summary ?? undefined,
     estMinutes: p.estMinutes ?? undefined,
@@ -49,6 +50,7 @@ export function toolToApi(t: Tool & { paths: (SopPath & { steps: SopStep[] })[] 
     pricing: t.pricing,
     platform: t.platform,
     rating: t.rating,
+    createdAt: t.createdAt,
     pros: arr(t.pros),
     cons: arr(t.cons),
     compliance: t.compliance,
@@ -57,10 +59,10 @@ export function toolToApi(t: Tool & { paths: (SopPath & { steps: SopStep[] })[] 
   };
 }
 
-/** 用法库条目（sop_paths 中 usageId 非空 的视图），供 /api/content/usages */
+/** 用法库条目（所有 sop_paths），供 /api/content/usages */
 export function usageToApi(p: SopPath & { steps: SopStep[]; tool: Tool }) {
   return {
-    id: p.usageId ?? p.id,
+    id: p.usageId || p.id,
     title: p.title,
     scene: p.scene ?? arr(p.tool.scenes)[0] ?? "",
     role: p.forRole ?? "",

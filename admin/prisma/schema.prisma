@@ -149,14 +149,15 @@ model Feedback {
 }
 
 model Submission {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  type       String
-  payload    String // JSON
-  status     String   @default("pending")
-  reviewerId String?
-  createdAt  DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  type         String
+  payload      String // JSON
+  status       String   @default("pending")
+  reviewerId   String?
+  resultToolId String? // 转工具后关联的工具 id，便于审核页回链
+  createdAt    DateTime @default(now())
 }
 
 // ---------------- RBAC ----------------

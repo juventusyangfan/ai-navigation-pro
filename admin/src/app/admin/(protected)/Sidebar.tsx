@@ -10,6 +10,7 @@ const NAV: { group: string; items: { href: string; label: string }[] }[] = [
       { href: "/admin", label: "仪表盘" },
       { href: "/admin/tools", label: "工具管理" },
       { href: "/admin/collect", label: "采集中心" },
+      { href: "/admin/submissions", label: "投稿审核" },
       { href: "/admin/sops", label: "SOP 编辑器" },
       { href: "/admin/usages", label: "用法库" },
       { href: "/admin/taxonomy", label: "分类法" },
@@ -19,7 +20,7 @@ const NAV: { group: string; items: { href: string; label: string }[] }[] = [
     group: "系统（Phase 3）",
     items: [
       { href: "/admin/users", label: "管理员与角色" },
-      { href: "/admin/feedback", label: "反馈 / 投稿审核" },
+      { href: "/admin/feedback", label: "反馈管理" },
       { href: "/admin/analytics", label: "数据看板" },
     ],
   },
