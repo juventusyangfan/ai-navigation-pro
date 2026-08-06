@@ -4,6 +4,8 @@ import { content } from "@/lib/content";
 import SceneTools from "@/components/SceneTools";
 import { Icon } from "@/lib/icons";
 
+export const dynamic = 'force-dynamic';
+
 export async function generateStaticParams() {
   try {
     const scenes = await content.getScenes();

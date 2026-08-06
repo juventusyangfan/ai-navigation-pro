@@ -56,6 +56,8 @@ const MODULES: LitModule[] = [
 
 const REL_TOOL_SLUGS = ["tongyi", "wenxin", "deepseek", "glm", "kimi", "bishun"];
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: "AI通识课 · 教AI导航",
 };

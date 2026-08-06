@@ -14,6 +14,8 @@ import ToolUsefulButton from "@/components/ToolUsefulButton";
 import { Icon } from "@/lib/icons";
 import ToolLogo from "@/components/ToolLogo";
 
+export const dynamic = 'force-dynamic';
+
 export async function generateStaticParams() {
   try {
     const toolMap = await content.getToolMap();
