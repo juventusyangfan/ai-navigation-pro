@@ -158,9 +158,8 @@ export default function SopPathView({
   const pct = total ? Math.round((doneCount / total) * 100) : 0;
 
   const usage = resolved.usage;
-  const toolName = resolved.toolName;
 
-  // 笔记写入入口（C2）：以 usageId 或 工具+标题 作为稳定 refId，写入 ea_notes
+  // 笔记写入入口（C2）：以 usageId 或 工具+标题 作为稳定 refId，云端按 (用户, path, refId) 唯一存储
   const refId = path.usageId ?? `${toolSlug ?? "sop"}:${path.title}`;
   const noteHref = path.usageId ? `/usages/${path.usageId}` : `/tool/${toolSlug ?? ""}`;
 
@@ -177,8 +176,6 @@ export default function SopPathView({
           {usage.pick && <span className="sop-pick">编辑精选</span>}
           <UsageUsefulCollect
             usageId={usage.id}
-            toolSlug={usage.tool}
-            toolName={toolName}
             baseUseful={usage.useful}
             baseCollect={usage.collect}
           />
@@ -266,7 +263,7 @@ export default function SopPathView({
         })}
       </div>
 
-      <NoteBox refId={refId} title={path.title} href={noteHref} />
+      <NoteBox refType="path" refId={refId} title={path.title} href={noteHref} />
     </div>
   );
 }

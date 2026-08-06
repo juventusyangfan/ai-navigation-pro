@@ -50,6 +50,8 @@ export function toolToApi(t: Tool & { paths: (SopPath & { steps: SopStep[] })[] 
     pricing: t.pricing,
     platform: t.platform,
     rating: t.rating,
+    useful: t.useful,
+    favCount: t.favCount,
     createdAt: t.createdAt,
     pros: arr(t.pros),
     cons: arr(t.cons),

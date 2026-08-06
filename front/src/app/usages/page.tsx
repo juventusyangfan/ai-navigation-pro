@@ -223,8 +223,6 @@ function UsagesInner() {
               <div className="sp-row">
                 <UsageUsefulCollect
                   usageId={usage.id}
-                  toolSlug={usage.tool}
-                  toolName={getToolName(usage.tool)}
                   baseUseful={usage.useful}
                   baseCollect={usage.collect}
                 />

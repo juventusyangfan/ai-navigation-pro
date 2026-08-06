@@ -3,50 +3,53 @@
 import { useState, useEffect } from "react";
 import { Icon } from "@/lib/icons";
 import { toast } from "@/lib/toast";
+import { fetchNote, saveNote } from "@/lib/interactions";
 
-// 一条 SOP 笔记在 localStorage 的存储结构。
-// 后台上线后，notes 表以 refId 为主键聚合，此结构可直接映射（见方案 2.4）。
-export type NoteRecord = {
-  title: string;
-  content: string;
-  href: string;
-  ts: number;
-};
-
-const KEY = "ea_notes"; // Record<refId, NoteRecord>
-
+// 一条 SOP 笔记对接后台 /api/me/notes（按 用户 + refType + refId 唯一存储）。
+// refType: "path" -> refId 传用法 usageId（或 sopPath id）；"tool" -> 传工具 slug。
 export default function NoteBox({
+  refType = "path",
   refId,
   title,
   href,
 }: {
+  refType?: string;
   refId: string;
   title: string;
   href: string;
 }) {
   const [content, setContent] = useState("");
   const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    try {
-      const all = JSON.parse(localStorage.getItem(KEY) || "{}") as Record<string, NoteRecord>;
-      const rec = all[refId];
-      if (rec && typeof rec.content === "string") setContent(rec.content);
-    } catch {
-      /* 忽略损坏数据 */
-    }
-  }, [refId]);
+    let alive = true;
+    (async () => {
+      const c = await fetchNote(refType, refId);
+      if (alive) setContent(c);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [refType, refId]);
 
-  const save = () => {
+  const save = async () => {
+    setBusy(true);
     try {
-      const all = JSON.parse(localStorage.getItem(KEY) || "{}") as Record<string, NoteRecord>;
-      all[refId] = { title, content, href, ts: Date.now() };
-      localStorage.setItem(KEY, JSON.stringify(all));
+      const res = await saveNote(refType, refId, content);
+      if (res.needLogin) {
+        toast("请先登录后再保存笔记");
+        return;
+      }
+      if (res.error) {
+        toast(res.error);
+        return;
+      }
       setSaved(true);
       toast("笔记已保存");
       setTimeout(() => setSaved(false), 1500);
-    } catch {
-      toast("保存失败，请重试");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -61,10 +64,10 @@ export default function NoteBox({
         placeholder="记一下这一步的关键心得、要替换的 {{变量}}、避坑点…"
       />
       <div className="fb-row">
-        <button className="btn btn-sm btn-primary" onClick={save}>
-          {saved ? "已保存" : "保存笔记"}
+        <button className="btn btn-sm btn-primary" onClick={save} disabled={busy}>
+          {busy ? "保存中…" : saved ? "已保存" : "保存笔记"}
         </button>
-        <span className="fb-count">仅本地保存（原型）· 后台上线后自动同步</span>
+        <span className="fb-count">已同步云端，可在「个人中心 → SOP 笔记」查看</span>
       </div>
     </div>
   );

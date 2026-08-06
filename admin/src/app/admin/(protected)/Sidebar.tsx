@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const NAV: { group: string; items: { href: string; label: string }[] }[] = [
   {
@@ -17,8 +17,9 @@ const NAV: { group: string; items: { href: string; label: string }[] }[] = [
     ],
   },
   {
-    group: "系统（Phase 3）",
+    group: "用户",
     items: [
+      { href: "/admin/members", label: "注册用户" },
       { href: "/admin/users", label: "管理员与角色" },
       { href: "/admin/feedback", label: "反馈管理" },
       { href: "/admin/analytics", label: "数据看板" },
@@ -28,8 +29,15 @@ const NAV: { group: string; items: { href: string; label: string }[] }[] = [
 
 export default function Sidebar({ name, role }: { name: string; role: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/admin/login");
+    router.refresh();
+  }
 
   return (
     <aside className="sidebar">
@@ -56,6 +64,9 @@ export default function Sidebar({ name, role }: { name: string; role: string }) 
           <b>{name}</b>
         </div>
         <div>角色：{role}</div>
+        <div className="logout" onClick={logout}>
+          退出登录
+        </div>
       </div>
     </aside>
   );

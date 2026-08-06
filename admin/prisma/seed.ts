@@ -117,6 +117,9 @@ async function main() {
       { resource: "taxonomy", action: "delete" },
       { resource: "media", action: "read" },
       { resource: "media", action: "write" },
+      { resource: "users", action: "read" },
+      { resource: "users", action: "write" },
+      { resource: "users", action: "delete" },
     ],
     reviewer: [
       { resource: "ratings", action: "read" },
@@ -125,6 +128,7 @@ async function main() {
       { resource: "feedback", action: "review" },
       { resource: "submissions", action: "read" },
       { resource: "submissions", action: "review" },
+      { resource: "users", action: "read" },
     ],
     school_admin: [
       { resource: "pushes", action: "read" },

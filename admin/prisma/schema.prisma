@@ -45,6 +45,8 @@ model Tool {
   pricing    String // Free|Freemium|Paid|Enterprise
   platform   String
   rating     Float    @default(0)
+  useful     Int      @default(0) // 标记「有用」的用户数（缓存计数）
+  favCount   Int      @default(0) // 收藏用户数（缓存计数）
   pros       String // JSON string[]
   cons       String // JSON string[]
   compliance String
@@ -91,17 +93,21 @@ model SopStep {
   branch       String? // JSON {when,then}[]
 }
 
-// ---------------- 公开站账号与互动（Phase 3 落库，表先建好） ----------------
+// ---------------- 公开站账号与互动（前台注册用户） ----------------
+// phone 为登录标识（系统游客账号 phone 为 null）；email 预留、注册用户可不填。
 model User {
   id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
+  phone        String?  @unique
+  email        String?  @unique
+  name         String // 真实姓名
   passwordHash String?
-  role         String   @default("teacher") // 老师|学生|家长
+  role         String   @default("teacher") // teacher|student|parent|school_admin
+  status       String   @default("active") // active|disabled
   createdAt    DateTime @default(now())
   ratings      Rating[]
   favorites    Favorite[]
   notes        Note[]
+  usefuls      Useful[]
   feedback     Feedback[]
   submissions  Submission[]
 }
@@ -118,13 +124,17 @@ model Rating {
   @@unique([userId, toolId])
 }
 
+// 收藏（工具 / 用法路径）：复用 refType+refId 多态，与 Useful 模型保持同一范式。
+// tool 收藏 refId 存工具 slug；path 收藏 refId 存 sop_paths 的 usageId（或 id）。
+// 与「有用」解耦：工具收藏只动 Tool.favCount，路径收藏只动 SopPath.collectCount。
 model Favorite {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  toolId    String
+  refType   String // "tool" | "path"
+  refId     String
   createdAt DateTime @default(now())
-  @@unique([userId, toolId])
+  @@unique([userId, refType, refId])
 }
 
 model Note {
@@ -135,6 +145,19 @@ model Note {
   refId     String
   content   String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([userId, refType, refId])
+}
+
+// 标记「有用」：按资源类型（工具 / 用法路径）记录用户对单条内容的认可
+model Useful {
+  id      String   @id @default(cuid())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id])
+  refType String // "tool" | "path"
+  refId   String
+  createdAt DateTime @default(now())
+  @@unique([userId, refType, refId])
 }
 
 model Feedback {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "@/lib/toast";
 import { Icon } from "@/lib/icons";
+import { submitFeedback } from "@/lib/interactions";
 
 export default function FeedbackBox({
   toolSlug,
@@ -13,23 +14,30 @@ export default function FeedbackBox({
 }) {
   const [text, setText] = useState("");
   const [kind, setKind] = useState<"纠错" | "建议">("纠错");
+  const [busy, setBusy] = useState(false);
 
-  function submit() {
+  async function submit() {
     const value = text.trim();
     if (!value) {
       toast("请先填写内容");
       return;
     }
+    setBusy(true);
     try {
-      const list: { tool: string; type: string; text: string; ts: number }[] =
-        JSON.parse(localStorage.getItem("ea_fb") || "[]");
-      list.push({ tool: toolSlug, type: kind, text: value, ts: Date.now() });
-      localStorage.setItem("ea_fb", JSON.stringify(list));
-    } catch {
-      /* ignore */
+      const res = await submitFeedback(toolSlug, kind, value);
+      if (res.needLogin) {
+        toast("请先登录后再提交反馈");
+        return;
+      }
+      if (res.error) {
+        toast(res.error);
+        return;
+      }
+      setText("");
+      toast("已提交反馈，可在「个人中心 → 我的反馈」查看");
+    } finally {
+      setBusy(false);
     }
-    setText("");
-    toast("已提交反馈，可在「个人中心 → 我的反馈」查看");
   }
 
   return (
@@ -57,8 +65,12 @@ export default function FeedbackBox({
         placeholder="请描述你的建议或发现的问题…"
       />
       <div className="fb-row">
-        <button className="btn btn-sm btn-primary" onClick={submit}>
-          提交反馈
+        <button
+          className="btn btn-sm btn-primary"
+          onClick={submit}
+          disabled={busy}
+        >
+          {busy ? "提交中…" : "提交反馈"}
         </button>
         <span className="fb-count">提交后可在「个人中心 → 我的反馈」查看</span>
       </div>

@@ -59,6 +59,8 @@ a { color: inherit; text-decoration: none; }
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 .sidebar .brand {
   color: #fff;
@@ -82,16 +84,37 @@ a { color: inherit; text-decoration: none; }
 .nav-link:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
 .nav-link.active { background: var(--primary); color: #fff; }
 .sidebar .me {
-  margin-top: 16px;
-  padding: 10px;
+  margin-top: auto;
+  padding: 12px 10px 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 12.5px;
   color: #94a3b8;
+  line-height: 1.6;
 }
 .sidebar .me b { color: #e2e8f0; font-weight: 600; }
-.sidebar .logout { color: #fca5a5; cursor: pointer; }
+.sidebar .me .logout { color: #fca5a5; cursor: pointer; margin-top: 6px; font-size: 12px; }
+.sidebar .me .logout:hover { color: #f87171; }
 
-.main { flex: 1; min-width: 0; padding: 24px 28px; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; height: 52px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border); background: var(--panel);
+}
+.topbar .user-info { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.topbar .user-info .name { font-weight: 600; }
+.topbar .user-info .role-badge {
+  display: inline-block; padding: 2px 10px; border-radius: 999px;
+  font-size: 11.5px; background: #eef2ff; color: var(--primary); border: 1px solid #bfdbfe;
+}
+.topbar .logout-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  border: 1px solid #fecdd3; color: var(--danger); background: #fff;
+  transition: background 0.15s;
+}
+.topbar .logout-btn:hover { background: #fef2f2; }
+.main-body { flex: 1; padding: 24px 28px; overflow-y: auto; }
 .page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .page-head h1 { font-size: 20px; margin: 0; }
 .page-head .desc { color: var(--muted); font-size: 13px; margin-top: 2px; }
@@ -145,7 +168,20 @@ textarea.inp { resize: vertical; min-height: 76px; font-family: var(--mono); }
 .badge.ok { color: var(--ok); border-color: #bbf7d0; background: #f0fdf4; }
 .badge.warn { color: var(--warn); border-color: #fde68a; background: #fffbeb; }
 .badge.draft { color: var(--muted); }
+.badge.bad { color: var(--danger); border-color: #fecdd3; background: #fef2f2; }
 .empty { color: var(--muted); padding: 24px; text-align: center; }
+
+/* 过滤栏 + 分页 */
+.filterbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.filterbar select, .filterbar input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; background: #fff; color: var(--ink); }
+.pager { margin-top: 16px; display: flex; justify-content: center; align-items: center; gap: 12px; }
+
+/* 表单消息 */
+.form-errors { color: var(--danger); font-size: 13px; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; background: #fef2f2; border: 1px solid #fecdd3; }
+.form-errors.ok { color: var(--ok); background: #f0fdf4; border-color: #bbf7d0; }
+
+/* 详情区段标题 */
+.sec-title { font-size: 15px; font-weight: 700; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 
 /* ---------- SOP 编辑器 ---------- */
 .sop-editor { display: grid; grid-template-columns: 320px 1fr 380px; gap: 16px; align-items: start; }
@@ -225,3 +261,12 @@ textarea.inp { resize: vertical; min-height: 76px; font-family: var(--mono); }
 .color-row input[type="color"] {
   width: 38px; height: 34px; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: #fff;
 }
+
+/* ---------- 注册用户管理补充 ---------- */
+.filterbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.filterbar select, .filterbar input { height: 34px; }
+.t-name { font-weight: 600; color: var(--ink); }
+.pager { display: flex; gap: 12px; align-items: center; margin-top: 14px; }
+.btn.ghost { background: #fff; color: var(--ink); border-color: var(--border); }
+.btn.ghost:hover { background: var(--bg); }
+.btn.block { width: 100%; }
