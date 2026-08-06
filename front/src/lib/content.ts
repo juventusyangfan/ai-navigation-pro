@@ -133,17 +133,28 @@ function apiUrl(path: string): string {
   return `${base}/api/content${path}`;
 }
 
+// 安全 fetch：build 时 admin API 可能不可达，失败返回 null 而非抛错
+async function safeFetch<T>(url: string, fallback: T): Promise<T> {
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) return fallback;
+    return (await r.json()) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 const remoteSource: ContentSource = {
-  getTools: () => fetch(apiUrl("/tools")).then((r) => r.json()),
+  getTools: () => safeFetch<Tool[]>(apiUrl("/tools"), []),
   getTool: async (slug) => {
-    const r = await fetch(apiUrl(`/tools/${slug}`));
-    return r.ok ? r.json() : null;
+    const r = await safeFetch<Tool | null>(apiUrl(`/tools/${slug}`), null);
+    return r;
   },
   getToolMap: async () => {
     const list = await remoteSource.getTools();
     return Object.fromEntries(list.map((t) => [t.slug, t]));
   },
-  getScenes: () => fetch(apiUrl("/scenes")).then((r) => r.json()),
+  getScenes: () => safeFetch<Scene[]>(apiUrl("/scenes"), []),
   getScene: async (key) => {
     const list = await remoteSource.getScenes();
     return list.find((s) => s.key === key) ?? null;
@@ -153,11 +164,10 @@ const remoteSource: ContentSource = {
     return Object.fromEntries(list.map((s) => [s.key, s.name]));
   },
   getCategories: () =>
-    fetch(apiUrl("/taxonomy/categories")).then((r) => r.json()),
-  getUsages: () => fetch(apiUrl("/usages")).then((r) => r.json()),
+    safeFetch<Record<string, Cat>>(apiUrl("/taxonomy/categories"), {}),
+  getUsages: () => safeFetch<Usage[]>(apiUrl("/usages"), []),
   getUsage: async (id) => {
-    const r = await fetch(apiUrl(`/usages/${id}`));
-    return r.ok ? r.json() : null;
+    return safeFetch<Usage | null>(apiUrl(`/usages/${id}`), null);
   },
   toolsByScene: async (key) => {
     const list = await remoteSource.getTools();
