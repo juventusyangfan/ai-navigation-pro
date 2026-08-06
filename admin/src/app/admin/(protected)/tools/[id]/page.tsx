@@ -22,7 +22,6 @@ interface FormState {
   alts: string;
   compliance: string;
   status: string;
-  rating: string;
 }
 
 const EMPTY: FormState = {
@@ -42,7 +41,6 @@ const EMPTY: FormState = {
   alts: "",
   compliance: "",
   status: "draft",
-  rating: "0",
 };
 
 const csv = (v: string) => v.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
@@ -87,7 +85,6 @@ export default function ToolEditor() {
           alts: join(JSON.parse(d.alts || "[]")),
           compliance: d.compliance,
           status: d.status,
-          rating: String(d.rating ?? 0),
         });
         setLoaded(true);
       });
@@ -117,7 +114,6 @@ export default function ToolEditor() {
       alts: csv(form.alts),
       compliance: form.compliance,
       status: form.status,
-      rating: Number(form.rating) || 0,
     };
     const res = await fetch(isNew ? "/api/admin/tools" : `/api/admin/tools/${id}`, {
       method: isNew ? "POST" : "PUT",
@@ -211,10 +207,6 @@ export default function ToolEditor() {
         <label className="field">
           <span>替代工具 slug（逗号分隔）</span>
           <input className="inp" value={form.alts} onChange={(e) => set("alts", e.target.value)} />
-        </label>
-        <label className="field">
-          <span>评分</span>
-          <input className="inp" type="number" step="0.1" value={form.rating} onChange={(e) => set("rating", e.target.value)} />
         </label>
         <label className="field">
           <span>状态</span>

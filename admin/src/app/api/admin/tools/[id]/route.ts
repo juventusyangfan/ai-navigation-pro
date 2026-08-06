@@ -47,7 +47,6 @@ export async function PUT(req: Request, { params }: Ctx) {
       alts: b.alts ? JSON.stringify(b.alts) : tool.alts,
       compliance: b.compliance ?? tool.compliance,
       status: b.status ?? tool.status,
-      rating: b.rating != null ? Number(b.rating) : tool.rating,
     },
   });
   return ok(updated);

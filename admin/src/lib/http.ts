@@ -7,8 +7,8 @@ export function ok(data: unknown, init?: ResponseInit) {
   return NextResponse.json(data, init);
 }
 
-export function fail(status: number, message: string) {
-  return NextResponse.json({ error: message }, { status });
+export function fail(status: number, message: string, init?: ResponseInit) {
+  return NextResponse.json({ error: message }, { status, ...init });
 }
 
 /** 读取当前会话并加载带角色的 AdminUser；无会话/禁用返回 null */
@@ -43,4 +43,14 @@ export async function requireAdmin(
 export function corsHeaders() {
   const origin = process.env.NEXT_PUBLIC_SITE_ORIGIN;
   return { "Access-Control-Allow-Origin": origin || "*", "Access-Control-Allow-Methods": "GET,OPTIONS" };
+}
+
+/** 公开鉴权 API 的 CORS 头（允许跨域 POST + 预检，供前台 :3000 调用） */
+export function corsAuth() {
+  const origin = process.env.NEXT_PUBLIC_SITE_ORIGIN;
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+  };
 }

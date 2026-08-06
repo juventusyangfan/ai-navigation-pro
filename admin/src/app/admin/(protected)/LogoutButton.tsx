@@ -10,8 +10,8 @@ export default function LogoutButton() {
     router.refresh();
   }
   return (
-    <span className="logout" onClick={logout}>
+    <button className="logout-btn" onClick={logout}>
       退出登录
-    </span>
+    </button>
   );
 }

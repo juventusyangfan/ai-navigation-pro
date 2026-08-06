@@ -9,12 +9,18 @@ import SopTabs from "@/components/SopTabs";
 import FeedbackBox from "@/components/FeedbackBox";
 import StarRating from "@/components/StarRating";
 import ToolRating from "@/components/ToolRating";
+import FavButton from "@/components/FavButton";
+import ToolUsefulButton from "@/components/ToolUsefulButton";
 import { Icon } from "@/lib/icons";
 import ToolLogo from "@/components/ToolLogo";
 
 export async function generateStaticParams() {
-  const toolMap = await content.getToolMap();
-  return Object.keys(toolMap).map((slug) => ({ slug }));
+  try {
+    const toolMap = await content.getToolMap();
+    return Object.keys(toolMap).map((slug) => ({ slug }));
+  } catch {
+    return [];
+  }
 }
 
 export async function generateMetadata({
@@ -71,6 +77,8 @@ export default async function ToolPage({
             >
               前往官网 <Icon name="ArrowUpRight" size={12} className="inline" />
             </a>
+            <FavButton slug={t.slug} name={t.name} inline />
+            <ToolUsefulButton slug={t.slug} baseUseful={t.useful} />
             <span className="text-muted" style={{ fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6 }}>
               <StarRating value={t.rating} size={13} showNumber /> · {t.subjects.join("/")}
             </span>

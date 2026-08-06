@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   const submission = await db.submission.create({
     data: {
       type: "tool",
-      payload: JSON.stringify((b as { payload })?.payload ?? {}),
+      payload: JSON.stringify((b as { payload?: unknown })?.payload ?? {}),
       userId: guest.id,
       status: "pending",
     },

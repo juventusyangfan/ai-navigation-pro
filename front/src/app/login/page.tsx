@@ -1,33 +1,46 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { login, setSession } from "@/lib/auth";
 
-const ROLES = [
-  { value: "teacher", label: "教师" },
-  { value: "student", label: "学生" },
-  { value: "parent", label: "家长" },
-  { value: "admin", label: "学校管理员" },
-];
+const PHONE_RE = /^1[3-9]\d{9}$/;
 
 export default function LoginPage() {
-  const [name, setName] = useState("");
-  const [role, setRole] = useState("teacher");
+  const router = useRouter();
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      alert("请输入昵称");
+    setError("");
+    if (!PHONE_RE.test(phone)) {
+      setError("请输入正确的 11 位手机号");
       return;
     }
+    if (!password) {
+      setError("请输入登录密码");
+      return;
+    }
+    setLoading(true);
     try {
-      localStorage.setItem(
-        "ea_user",
-        JSON.stringify({ name: name.trim(), role, ts: Date.now() }),
-      );
-      window.location.href = "/profile";
-    } catch {
-      alert("登录失败，请重试");
+      const data = await login(phone, password);
+      setSession({
+        id: data.user.id,
+        name: data.user.name,
+        phone: data.user.phone,
+        role: data.user.role,
+        token: data.token,
+        ts: Date.now(),
+      });
+      router.push("/profile");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "登录失败，请重试");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -41,7 +54,7 @@ export default function LoginPage() {
               width: 54,
               height: 54,
               borderRadius: 14,
-              background: "linear-gradient(135deg,var(--color-primary),#7c3aed)",
+              background: "var(--color-primary)",
               color: "#fff",
               display: "grid",
               placeItems: "center",
@@ -53,33 +66,43 @@ export default function LoginPage() {
           </div>
           <h2 style={{ fontSize: 22, fontWeight: 850 }}>登录教AI导航</h2>
           <p className="muted" style={{ margin: "6px 0 20px" }}>
-            原型用本地模拟登录，正式版接入账号体系
+            使用注册手机号与密码登录
           </p>
+
           <form onSubmit={handleSubmit}>
             <div className="field" style={{ textAlign: "left" }}>
-              <label>昵称</label>
+              <label>手机号</label>
               <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="如：李老师"
-                autoComplete="off"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="11 位手机号"
+                inputMode="numeric"
+                maxLength={11}
+                autoComplete="tel"
               />
             </div>
             <div className="field" style={{ textAlign: "left" }}>
-              <label>我是</label>
-              <select value={role} onChange={(e) => setRole(e.target.value)}>
-                {ROLES.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
+              <label>登录密码</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="请输入密码"
+                autoComplete="current-password"
+              />
             </div>
-            <button className="btn btn-primary btn-block" type="submit">
-              进入
+
+            {error && <div className="auth-error">{error}</div>}
+
+            <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
+              {loading ? "登录中…" : "登录"}
             </button>
           </form>
-          <p className="login-hint" style={{ marginTop: 14 }}>
+
+          <p className="auth-switch">
+            还没有账号？<Link href="/register">立即注册</Link>
+          </p>
+          <p className="login-hint" style={{ marginTop: 10 }}>
             <Link href="/" style={{ color: "var(--color-primary)" }}>
               返回首页
             </Link>

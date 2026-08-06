@@ -7,8 +7,12 @@ import UsageUsefulCollect from "@/components/UsageUsefulCollect";
 import { Icon } from "@/lib/icons";
 
 export async function generateStaticParams() {
-  const us = await content.getUsages();
-  return us.map((u) => ({ id: u.id }));
+  try {
+    const us = await content.getUsages();
+    return us.map((u) => ({ id: u.id }));
+  } catch {
+    return [];
+  }
 }
 
 export async function generateMetadata({
@@ -81,8 +85,6 @@ export default async function UsageDetailPage({
         <div className="detail-actions">
           <UsageUsefulCollect
             usageId={usage.id}
-            toolSlug={usage.tool}
-            toolName={tool?.name ?? usage.tool}
             baseUseful={usage.useful}
             baseCollect={usage.collect}
           />

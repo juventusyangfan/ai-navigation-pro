@@ -2,19 +2,26 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { content, type Tool } from "@/lib/content";
-import type { NoteRecord } from "@/components/NoteBox";
+import { content, type Tool, type Usage } from "@/lib/content";
 import { Icon } from "@/lib/icons";
 import ToolLogo from "@/components/ToolLogo";
+import { clearSession } from "@/lib/auth";
+import {
+  fetchMyFavoritesSlugs,
+  fetchMyFavoritesPathIds,
+  fetchMyFeedback,
+  fetchMyNotes,
+  type FeedbackItem,
+  type NoteItem,
+} from "@/lib/interactions";
 
-type User = { name: string; role: string; ts: number } | null;
-type Feedback = { tool: string; type: string; text: string; ts: number };
+type User = { id: string; name: string; phone: string; role: string; token: string; ts: number } | null;
 
 const ROLE_LABEL: Record<string, string> = {
   teacher: "教师",
   student: "学生",
   parent: "家长",
-  admin: "学校管理员",
+  school_admin: "学校管理员",
 };
 
 type Tab = "fav" | "note" | "fb" | "contrib";
@@ -35,9 +42,13 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User>(null);
   const [activeTab, setActiveTab] = useState<Tab>("fav");
 
-  const [tools, setTools] = useState<Tool[]>([]);
   const [toolMap, setToolMap] = useState<Record<string, Tool>>({});
   const [sceneName, setSceneName] = useState<Record<string, string>>({});
+  const [favSlugs, setFavSlugs] = useState<string[]>([]);
+  const [favPathIds, setFavPathIds] = useState<string[]>([]);
+  const [usages, setUsages] = useState<Usage[]>([]);
+  const [notes, setNotes] = useState<NoteItem[]>([]);
+  const [fbList, setFbList] = useState<FeedbackItem[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem("ea_user");
@@ -51,10 +62,65 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
-    content.getTools().then(setTools);
     content.getToolMap().then(setToolMap);
     content.getSceneName().then(setSceneName);
   }, []);
+
+  // 登录后从后台拉取收藏列表（未登录回退本地镜像，兼容旧数据）
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      let slugs: string[] = [];
+      try {
+        slugs = await fetchMyFavoritesSlugs();
+      } catch {
+        slugs = [];
+      }
+      if (!slugs.length) {
+        try {
+          slugs = JSON.parse(localStorage.getItem("ea_favs") || "[]");
+        } catch {
+          slugs = [];
+        }
+      }
+      setFavSlugs(slugs);
+    })();
+  }, [user]);
+
+  // 拉取收藏的用法列表
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      let pids: string[] = [];
+      try {
+        pids = await fetchMyFavoritesPathIds();
+      } catch {
+        pids = [];
+      }
+      if (!pids.length) {
+        try {
+          pids = JSON.parse(localStorage.getItem("ea_fav_paths") || "[]");
+        } catch {
+          pids = [];
+        }
+      }
+      setFavPathIds(pids);
+    })();
+    content.getUsages().then(setUsages);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const [n, f] = await Promise.all([fetchMyNotes(), fetchMyFeedback()]);
+      setNotes(n);
+      setFbList(f);
+    })();
+  }, [user]);
+
+  const favUsages = favPathIds
+    .map((id) => usages.find((u) => u.id === id))
+    .filter(Boolean) as Usage[];
 
   if (!user) {
     return (
@@ -73,20 +139,14 @@ export default function ProfilePage() {
     );
   }
 
-  const favs: string[] = JSON.parse(localStorage.getItem("ea_favs") || "[]");
-  const notes: Record<string, NoteRecord> = JSON.parse(
-    localStorage.getItem("ea_notes") || "{}",
-  );
-  const fbList: Feedback[] = JSON.parse(localStorage.getItem("ea_fb") || "[]");
-
-  const favTools = favs
-    .map((slug) => tools.find((t) => t.slug === slug))
+  const favTools = favSlugs
+    .map((slug) => toolMap[slug])
     .filter(Boolean) as Tool[];
 
   const roleLabel = ROLE_LABEL[user.role] || user.role;
 
   const handleLogout = () => {
-    localStorage.removeItem("ea_user");
+    clearSession();
     window.location.href = "/";
   };
 
@@ -113,11 +173,11 @@ export default function ProfilePage() {
 
       <div className="me-stats">
         <div className="stat-card">
-          <div className="n" id="st-fav">{favs.length}</div>
-          <div className="l">收藏工具</div>
+          <div className="n" id="st-fav">{favTools.length + favUsages.length}</div>
+          <div className="l">我的收藏</div>
         </div>
         <div className="stat-card">
-          <div className="n" id="st-note">{Object.keys(notes).length}</div>
+          <div className="n" id="st-note">{notes.length}</div>
           <div className="l">SOP 笔记</div>
         </div>
         <div className="stat-card">
@@ -140,66 +200,113 @@ export default function ProfilePage() {
 
       {activeTab === "fav" && (
         <div id="p-fav">
-          {favTools.length > 0 ? (
-            favTools.map((t) => (
-              <Link
-                key={t.slug}
-                className="note-item"
-                href={`/tool/${t.slug}`}
-                style={{ display: "block" }}
-              >
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  <div
-                    className="tool-logo"
-                    style={{
-                      width: 40,
-                      height: 40,
-                      fontSize: 15,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ToolLogo logo={t.logo} name={t.name} color={t.color} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h4>{t.name}</h4>
-                    <div className="meta">{t.tagline}</div>
-                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                      {t.scenes.slice(0, 2).map((s) => (
-                        <span key={s} className="tag scene">
-                          {sceneName[s] || s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))
-          ) : (
+          {favTools.length === 0 && favUsages.length === 0 ? (
             <div className="soon-card">
-              还没有收藏，去工具详情点{" "}
+              还没有收藏，去工具详情或用法页点{" "}
               <Icon name="Heart" size={14} className="inline" /> 吧。
             </div>
+          ) : (
+            <>
+              {favTools.map((t) => (
+                <Link
+                  key={`tool-${t.slug}`}
+                  className="note-item"
+                  href={`/tool/${t.slug}`}
+                  style={{ display: "block" }}
+                >
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <div
+                      className="tool-logo"
+                      style={{
+                        width: 40,
+                        height: 40,
+                        fontSize: 15,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <ToolLogo logo={t.logo} name={t.name} color={t.color} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h4>{t.name}</h4>
+                      <div className="meta">{t.tagline}</div>
+                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                        {t.scenes.slice(0, 2).map((s) => (
+                          <span key={s} className="tag scene">
+                            {sceneName[s] || s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+              {favUsages.map((u) => {
+                const tool = toolMap[u.tool];
+                return (
+                  <Link
+                    key={`usage-${u.id}`}
+                    className="note-item"
+                    href={`/usages/${u.id}`}
+                    style={{ display: "block" }}
+                  >
+                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                      <div
+                        className="tool-logo"
+                        style={{
+                          background: "var(--color-teal-soft)",
+                          color: "var(--color-teal)",
+                          width: 40,
+                          height: 40,
+                          fontSize: 14,
+                          flexShrink: 0,
+                          display: "grid",
+                          placeItems: "center",
+                        }}
+                      >
+                        <Icon name="Notebook" size={18} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h4>{u.title}</h4>
+                        <div className="meta">
+                          {tool?.name || u.tool} · {u.subj} · {u.steps} 步 SOP
+                        </div>
+                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                          <span className={`rb rb-${u.role === "老师" ? "teacher" : u.role === "学生" ? "student" : u.role === "家长" ? "parent" : "admin"}`}>
+                            {u.role}
+                          </span>
+                          <span className="tag scene">
+                            {sceneName[u.scene] || u.scene}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </>
           )}
         </div>
       )}
 
       {activeTab === "note" && (
         <div id="p-note">
-          {Object.keys(notes).length > 0 ? (
-            Object.entries(notes).map(([refId, rec]) => {
+          {notes.length > 0 ? (
+            notes.map((rec) => {
+              const usage =
+                rec.refType === "path"
+                  ? usages.find((u) => u.id === rec.refId)
+                  : undefined;
+              const title = usage?.title || toolMap[rec.refId]?.name || rec.refId;
+              const link =
+                rec.refType === "path" ? `/usages/${rec.refId}` : `/tool/${rec.refId}`;
               return (
-                <div key={refId} className="note-item">
-                  <h4>{rec.title || refId}</h4>
+                <div key={`${rec.refType}:${rec.refId}`} className="note-item">
+                  <h4>{title}</h4>
                   <div className="meta">
                     我的 SOP 笔记 ·{" "}
-                    {rec.href && (
-                      <Link
-                        href={rec.href}
-                        style={{ color: "var(--color-primary)" }}
-                      >
-                        查看 SOP →
-                      </Link>
-                    )}
+                    <Link href={link} style={{ color: "var(--color-primary)" }}>
+                      查看 SOP →
+                    </Link>
                   </div>
                   <p>{rec.content}</p>
                 </div>
@@ -214,14 +321,28 @@ export default function ProfilePage() {
       {activeTab === "fb" && (
         <div id="p-fb">
           {fbList.length > 0 ? (
-            fbList.map((f, i) => {
-              const tool = toolMap[f.tool];
+            fbList.map((f) => {
+              const tool = toolMap[f.toolSlug];
+              const badge =
+                f.status === "approved"
+                  ? "ok"
+                  : f.status === "rejected"
+                    ? "bad"
+                    : "warn";
+              const label =
+                f.status === "approved"
+                  ? "已采纳"
+                  : f.status === "rejected"
+                    ? "已忽略"
+                    : "待处理";
               return (
-                <div key={i} className="note-item">
+                <div key={f.id} className="note-item">
                   <h4>
-                    {tool ? tool.name : f.tool} · {f.type}
+                    {tool ? tool.name : f.toolName} · {f.type}
                   </h4>
-                  <div className="meta">{formatTime(f.ts)}</div>
+                  <div className="meta">
+                    {formatTime(f.ts)} · <span className={`badge ${badge}`}>{label}</span>
+                  </div>
                   <p>{f.text}</p>
                 </div>
               );

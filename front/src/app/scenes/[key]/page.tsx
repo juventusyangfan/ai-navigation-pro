@@ -5,8 +5,12 @@ import SceneTools from "@/components/SceneTools";
 import { Icon } from "@/lib/icons";
 
 export async function generateStaticParams() {
-  const scenes = await content.getScenes();
-  return scenes.map((s) => ({ key: s.key }));
+  try {
+    const scenes = await content.getScenes();
+    return scenes.map((s) => ({ key: s.key }));
+  } catch {
+    return [];
+  }
 }
 
 export async function generateMetadata({

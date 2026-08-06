@@ -59,6 +59,8 @@ export interface Tool {
   pricing: Pricing;
   platform: string;
   rating: number;
+  useful: number;
+  favCount: number;
   createdAt?: string;
   pros: string[];
   cons: string[];
