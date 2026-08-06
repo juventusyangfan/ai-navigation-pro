@@ -5,7 +5,7 @@ module.exports = {
       cwd: "/srv/app/ai-navigation-pro/admin",
       script: "npm",
       args: "run start",
-      env: { PORT: 3001, NODE_ENV: "production", DATABASE_URL: "file:/srv/app/data/prod.db" }
+      env: { PORT: 3001, NODE_ENV: "production", DATABASE_URL: "file:/srv/app/ai-navigation-pro/admin/prisma/dev.db" }
     },
     {
       name: "front",
