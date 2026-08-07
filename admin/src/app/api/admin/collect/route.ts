@@ -54,7 +54,7 @@ export async function POST(req: Request) {
   const created: { slug: string; toolId: string; pathIds: string[] }[] = [];
 
   try {
-    // 预载已存在索引，做 slug / 主机名 / 名称 三重去重（防同工具换 slug 入库）
+  // 预载已存在索引，做 slug / 主机名 / 名称 三重去重（防同工具换 slug 入库）
   const existing = await db.tool.findMany({ select: { slug: true, url: true, name: true } });
   const bySlug = new Set(existing.map((e) => e.slug).filter(Boolean));
   const byHost = new Set(existing.map((e) => normalizeHost(e.url)).filter(Boolean));
