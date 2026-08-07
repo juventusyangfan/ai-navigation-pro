@@ -129,7 +129,9 @@ export interface ContentSource {
 
 function apiUrl(path: string): string {
   if (path.startsWith("http")) return path;
-  const base = process.env.NEXT_PUBLIC_API_BASE ?? "";
+  // 服务端渲染(SSR)时优先走内网地址(INTERNAL_API_BASE)，避免依赖公网 DNS / 回环；
+  // 浏览器端该变量不存在，自动回落到公网域名 NEXT_PUBLIC_API_BASE。
+  const base = process.env.INTERNAL_API_BASE ?? process.env.NEXT_PUBLIC_API_BASE ?? "";
   return `${base}/api/content${path}`;
 }
 

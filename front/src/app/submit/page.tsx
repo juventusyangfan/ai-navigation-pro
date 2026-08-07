@@ -5,6 +5,7 @@ import { content, type Scene } from "@/lib/content";
 import { Icon } from "@/lib/icons";
 import { isImageLogo } from "@/lib/logo";
 import TagInput from "@/components/TagInput";
+import CopyButton from "@/components/CopyButton";
 
 const ROLE_OPTIONS = ["老师", "学生", "家长", "学校管理员"] as const;
 const PRICING_OPTIONS = [
@@ -452,7 +453,10 @@ export default function SubmitPage() {
           {draftJson ? (
             <div className="draft-box">
               <p className="muted">投稿通道暂未就绪，您可复制以下草稿留存，待开放后提交：</p>
-              <pre>{draftJson}</pre>
+              <div style={{ position: "relative" }}>
+                <pre>{draftJson}</pre>
+                <CopyButton text={draftJson} label="草稿已复制" idleLabel="复制草稿" />
+              </div>
             </div>
           ) : null}
         </form>
