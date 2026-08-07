@@ -12,7 +12,7 @@ module.exports = {
       cwd: "/srv/app/ai-navigation-pro/front",
       script: "npm",
       args: "run start",
-      env: { PORT: 3000, NODE_ENV: "production" }
+      env: { PORT: 3000, NODE_ENV: "production", INTERNAL_API_BASE: "http://127.0.0.1:3001" }
     }
   ]
 };
