@@ -2477,10 +2477,19 @@ section.block {
   box-shadow: var(--shadow-clay);
 }
 
+.copy-btn.copied {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+  pointer-events: none;
+}
+
 .step-output {
   margin-top: 10px;
   font-size: 14px;
   color: var(--color-text);
+  position: relative;
+  padding-right: 80px;
 }
 
 .step-output b {
@@ -2695,6 +2704,12 @@ section.block {
 .sop-copyall:hover {
   background: rgba(13, 148, 136, 0.18);
   box-shadow: var(--shadow-clay);
+}
+.sop-copyall.copied {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+  pointer-events: none;
 }
 
 /* 时间线连接线 */
