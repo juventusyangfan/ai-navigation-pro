@@ -80,7 +80,13 @@ export default function CollectPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "confirm", proposals: selected }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: { upserted?: number; rejected?: string[]; created?: { slug: string; toolId: string; pathIds: string[] }[]; error?: string } = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(res.ok ? "服务器返回异常" : `入库失败（${res.status}）：${text.slice(0, 200)}`);
+      }
       if (!res.ok) throw new Error(data?.error || "入库失败");
       setResult({ upserted: data.upserted || 0, rejected: data.rejected || [], created: data.created || [] });
       setRows((rs) => rs.filter((r) => !r.include));
