@@ -148,21 +148,22 @@ export async function runCollect(opts: CollectOptions): Promise<CollectProposal[
     `已知角色（roles 必须只从这些里选）：${KNOWN_ROLES.join(", ")}\n` +
     `排除：纯通用 LLM 无教育向、纯海外无 CN 访问通道、已停运产品。`;
 
+  const body = new TextEncoder().encode(JSON.stringify({
+    model: cfg.model,
+    temperature: 0.3,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userMsg },
+    ],
+  }));
   const resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
-      "content-type": "application/json",
+      "content-type": "application/json; charset=utf-8",
       authorization: `Bearer ${cfg.apiKey}`,
     },
-    body: JSON.stringify({
-      model: cfg.model,
-      temperature: 0.3,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userMsg },
-      ],
-    }),
+    body,
   });
 
   if (!resp.ok) {

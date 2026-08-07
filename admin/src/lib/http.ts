@@ -41,15 +41,15 @@ export async function requireAdmin(
 
 /** 公开内容 API 的 CORS 头（白名单由 NEXT_PUBLIC_SITE_ORIGIN 配置） */
 export function corsHeaders() {
-  const origin = process.env.NEXT_PUBLIC_SITE_ORIGIN;
-  return { "Access-Control-Allow-Origin": origin || "*", "Access-Control-Allow-Methods": "GET,OPTIONS" };
+  const origin = process.env.NEXT_PUBLIC_SITE_ORIGIN?.replace(/\/+$/, "") ?? "*";
+  return { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "GET,OPTIONS" };
 }
 
 /** 公开鉴权 API 的 CORS 头（允许跨域 POST + 预检，供前台 :3000 调用） */
 export function corsAuth() {
-  const origin = process.env.NEXT_PUBLIC_SITE_ORIGIN;
+  const origin = process.env.NEXT_PUBLIC_SITE_ORIGIN?.replace(/\/+$/, "") ?? "*";
   return {
-    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Authorization",
   };
