@@ -53,7 +53,8 @@ export async function POST(req: Request) {
   const rejected: string[] = [];
   const created: { slug: string; toolId: string; pathIds: string[] }[] = [];
 
-  // 预载已存在索引，做 slug / 主机名 / 名称 三重去重（防同工具换 slug 入库）
+  try {
+    // 预载已存在索引，做 slug / 主机名 / 名称 三重去重（防同工具换 slug 入库）
   const existing = await db.tool.findMany({ select: { slug: true, url: true, name: true } });
   const bySlug = new Set(existing.map((e) => e.slug).filter(Boolean));
   const byHost = new Set(existing.map((e) => normalizeHost(e.url)).filter(Boolean));
@@ -188,4 +189,8 @@ export async function POST(req: Request) {
   }
 
   return ok({ upserted, rejected, created });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "入库失败";
+    return fail(500, msg);
+  }
 }
