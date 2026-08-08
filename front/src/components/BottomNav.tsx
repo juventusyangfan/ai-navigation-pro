@@ -6,7 +6,7 @@ import { Icon } from "@/lib/icons";
 
 const tabs = [
   { href: "/", icon: "House", label: "首页" },
-  { href: "/scenes", icon: "Target", label: "场景" },
+  { href: "/tools", icon: "Wrench", label: "工具" },
   { href: "/usages", icon: "BookOpen", label: "用法" },
   { href: "/literacy", icon: "GraduationCap", label: "通识" },
   { href: "/profile", icon: "User", label: "我的" },
