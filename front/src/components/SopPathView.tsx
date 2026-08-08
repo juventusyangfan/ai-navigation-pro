@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Path, content, type Usage } from "@/lib/content";
-import CopyButton from "./CopyButton";
+import CopyButton, { copyText } from "./CopyButton";
 import NoteBox from "./NoteBox";
 import UsageUsefulCollect from "./UsageUsefulCollect";
 import { Icon } from "@/lib/icons";
@@ -163,10 +163,14 @@ export default function SopPathView({
   const refId = path.usageId ?? `${toolSlug ?? "sop"}:${path.title}`;
   const noteHref = path.usageId ? `/usages/${path.usageId}` : `/tool/${toolSlug ?? ""}`;
 
+  const [allCopied, setAllCopied] = useState(false);
   const copyAll = () => {
+    if (allCopied) return;
     const text = buildSopText(path);
-    navigator.clipboard?.writeText(text);
+    copyText(text);
+    setAllCopied(true);
     toast("已复制完整 SOP");
+    setTimeout(() => setAllCopied(false), 2000);
   };
 
   return (
@@ -192,8 +196,12 @@ export default function SopPathView({
             <div className="sop-progress-fill" style={{ width: `${pct}%` }} />
           </div>
         </div>
-        <button className="sop-copyall" onClick={copyAll}>
-          <Icon name="Copy" size={14} className="inline" /> 复制完整 SOP
+        <button className={`sop-copyall${allCopied ? " copied" : ""}`} onClick={copyAll}>
+          {allCopied ? (
+            <><Icon name="Check" size={14} weight="bold" className="inline" /> 已复制完整 SOP</>
+          ) : (
+            <><Icon name="Copy" size={14} className="inline" /> 复制完整 SOP</>
+          )}
         </button>
       </div>
 
@@ -226,6 +234,7 @@ export default function SopPathView({
                   <Icon name="ArrowRight" size={12} className="inline" />{" "}
                   <b>产出示例：</b>
                   {s.outputSample}
+                  <CopyButton text={s.outputSample} label="示例已复制" idleLabel="复制示例" />
                 </div>
                 {s.tip && (
                   <div className="tip">
