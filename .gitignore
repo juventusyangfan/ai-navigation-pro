@@ -1,1 +1,5 @@
 admin/prisma/dev.db
+# 环境配置文件（本地为主，不参与版本控制）
+.env
+.env.*
+!.env.example
