@@ -138,6 +138,71 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+      
+      {/* Latest Tools */}
+      <section className="block">
+        <div className="wrap">
+          <div className="sec-head">
+            <div>
+              <h2>最新收录</h2>
+            </div>
+            <Link href="/submit" className="link-more">
+              投稿工具 <Icon name="ArrowRight" size={12} className="inline" />
+            </Link>
+          </div>
+          <div className="tool-grid">
+            {latestTools.map((tool) => {
+              const sopCount = tool.paths.length;
+              return (
+                <div key={tool.slug} className="tool-card">
+                  <FavButton slug={tool.slug} name={tool.name} />
+                  <Link className="tool-top" href={`/tool/${tool.slug}`}>
+                    <div className="tool-logo">
+                      <ToolLogo logo={tool.logo} name={tool.name} color={tool.color} />
+                    </div>
+                    <div>
+                      <div className="tool-name">{tool.name}</div>
+                      <div className="tool-tagline">{tool.tagline}</div>
+                    </div>
+                  </Link>
+                  <div>
+                    {tool.roles.map((r) => (
+                      <span key={r} className="tag role">
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="tool-meta">
+                    {tool.scenes.map((sceneKey) => {
+                      const scene = scenes.find((s) => s.key === sceneKey);
+                      if (!scene) return null;
+                      return (
+                        <Link
+                          key={sceneKey}
+                          className="tag scene"
+                          href={`/scenes/${sceneKey}`}
+                        >
+                          {scene.name}
+                        </Link>
+                      );
+                    })}
+                    <span className={`price ${tool.pricing}`}>
+                      {pricingLabel(tool.pricing)}
+                    </span>
+                  </div>
+                  {sopCount > 0 && (
+                    <div style={{ marginTop: "4px" }}>
+                      <span className="tool-sop-badge">
+                        <Icon name="Notebook" size={13} className="inline" /> 含 {sopCount} 条使用路径
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       {/* Scenes Section */}
       <section className="block" style={{ paddingTop: "28px" }}>
@@ -329,71 +394,6 @@ export default function HomePage() {
           </div>
           <div className="tool-grid">
             {hotTools.map((tool) => {
-              const sopCount = tool.paths.length;
-              return (
-                <div key={tool.slug} className="tool-card">
-                  <FavButton slug={tool.slug} name={tool.name} />
-                  <Link className="tool-top" href={`/tool/${tool.slug}`}>
-                    <div className="tool-logo">
-                      <ToolLogo logo={tool.logo} name={tool.name} color={tool.color} />
-                    </div>
-                    <div>
-                      <div className="tool-name">{tool.name}</div>
-                      <div className="tool-tagline">{tool.tagline}</div>
-                    </div>
-                  </Link>
-                  <div>
-                    {tool.roles.map((r) => (
-                      <span key={r} className="tag role">
-                        {r}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="tool-meta">
-                    {tool.scenes.map((sceneKey) => {
-                      const scene = scenes.find((s) => s.key === sceneKey);
-                      if (!scene) return null;
-                      return (
-                        <Link
-                          key={sceneKey}
-                          className="tag scene"
-                          href={`/scenes/${sceneKey}`}
-                        >
-                          {scene.name}
-                        </Link>
-                      );
-                    })}
-                    <span className={`price ${tool.pricing}`}>
-                      {pricingLabel(tool.pricing)}
-                    </span>
-                  </div>
-                  {sopCount > 0 && (
-                    <div style={{ marginTop: "4px" }}>
-                      <span className="tool-sop-badge">
-                        <Icon name="Notebook" size={13} className="inline" /> 含 {sopCount} 条使用路径
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Latest Tools */}
-      <section className="block">
-        <div className="wrap">
-          <div className="sec-head">
-            <div>
-              <h2>最新收录</h2>
-            </div>
-            <Link href="/submit" className="link-more">
-              投稿工具 <Icon name="ArrowRight" size={12} className="inline" />
-            </Link>
-          </div>
-          <div className="tool-grid">
-            {latestTools.map((tool) => {
               const sopCount = tool.paths.length;
               return (
                 <div key={tool.slug} className="tool-card">
