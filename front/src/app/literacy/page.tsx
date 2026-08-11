@@ -1,137 +1,135 @@
 import Link from "next/link";
-import { content, type Tool } from "@/lib/content";
+import { content, type LitLessonCard, type LitModuleCard } from "@/lib/content";
 import { Icon } from "@/lib/icons";
 import ToolCard from "@/components/ToolCard";
+import ModuleCard from "@/components/literacy/ModuleCard";
 
-interface LitModule {
-  num: string;
-  title: string;
-  desc: string;
-  tools: string[];
-  sops: { tool: string; title: string }[];
-}
-
-const MODULES: LitModule[] = [
-  {
-    num: "一",
-    title: "什么是 AI",
-    desc: "搞懂大模型 / 生成式 AI 是什么、能做什么、不能做什么，建立正确预期，不再神化也不轻视。",
-    tools: ["tongyi", "wenxin"],
-    sops: [
-      { tool: "tongyi", title: "用通义千问给学生讲清「什么是大模型」" },
-      { tool: "wenxin", title: "用文心一格生成 AI 概念配图" },
-    ],
-  },
-  {
-    num: "二",
-    title: "提示词基础",
-    desc: "学会把需求说清楚：角色设定 + 结构化指令 + 给示例 + 逐步迭代，让 AI 听懂你的真实意图。",
-    tools: ["deepseek", "glm"],
-    sops: [
-      { tool: "deepseek", title: "用 DeepSeek 练「角色+任务+约束」三段式提示词" },
-      { tool: "glm", title: "用智谱 GLM 把模糊需求改写成清晰指令" },
-    ],
-  },
-  {
-    num: "三",
-    title: "AI 伦理与安全",
-    desc: "理解隐私与数据风险、避免思维惰化、守住内容合规与学术诚信——这是教育场景的红线。",
-    tools: ["deepseek", "kimi"],
-    sops: [
-      { tool: "deepseek", title: "用 DeepSeek 生成「AI 使用须知」卷首语（合规）" },
-      { tool: "kimi", title: "用 Kimi 检查一份作业是否过度依赖 AI" },
-    ],
-  },
-  {
-    num: "四",
-    title: "在学科中应用 AI",
-    desc: "把 AI 用到语文 / 数学 / 英语等真实教学环节，而非当玩具——启发式引导，而非直接给答案。",
-    tools: ["bishun", "tongyi", "deepseek"],
-    sops: [
-      { tool: "bishun", title: "用笔神做启发式作文批改（保护原创）" },
-      { tool: "tongyi", title: "用通义千问做英语思路引导（不讲答案）" },
-    ],
-  },
-];
-
-const REL_TOOL_SLUGS = ["tongyi", "wenxin", "deepseek", "glm", "kimi", "bishun"];
-
-export const dynamic = 'force-dynamic';
+// 落地页：首屏说完「国家平台讲原理、本站配练习」的桥接定位，
+// 再用配对条 / 分诊台 / 模块卡三块把老师引到对症的伴学课。
+// ISR 300：数据来自 admin API，失败由 safeFetch 兜底为空，页面不会崩。
+export const revalidate = 300;
 
 export const metadata = {
-  title: "AI通识课 · 教AI导航",
+  title: "AI通识课 · 智用笔记",
+  description:
+    "国家平台讲 AI 原理课，智用笔记给每节课配一句「你为什么要看」、一段本土化点评，和看完就能上手的分步 SOP。面向中小学教师的 AI 通识导学。",
 };
 
+// 分诊台：痛点 → 对症模块的首节。按模块顺序索引，数据驱动，seed 改动也不崩。
+const TRIAGE: { pain: string; moduleIdx: number }[] = [
+  { pain: "完全没碰过，怕在课堂上说错话", moduleIdx: 0 },
+  { pain: "会用，但它老是答非所问", moduleIdx: 1 },
+  { pain: "学生数据能不能喂给 AI，我心里没底", moduleIdx: 2 },
+  { pain: "下周就开学，我要能直接用的东西", moduleIdx: 3 },
+];
+
 export default async function LiteracyPage() {
-  const toolMap = await content.getToolMap();
-  const relTools = REL_TOOL_SLUGS.map((s) => toolMap[s]).filter(Boolean) as Tool[];
+  const [data, toolMap] = await Promise.all([
+    content.getLiteracyIndex(),
+    content.getToolMap(),
+  ]);
+  const modules = data.modules as LitModuleCard[];
+  const lessons = data.lessons as LitLessonCard[];
+
+  // 按模块分组课时
+  const byModule = new Map<string, LitLessonCard[]>();
+  for (const l of lessons) {
+    const arr = byModule.get(l.moduleSlug) ?? [];
+    arr.push(l);
+    byModule.set(l.moduleSlug, arr);
+  }
+
+  // 统计自动统计（不硬编码，避免过期）
+  const officialCount = lessons.filter((l) => l.source === "official").length;
+  const sopCount = lessons.reduce((s, l) => s + l.sopCount, 0);
+
+  // 相关工具：所有模块 toolSlugs 并集
+  const toolSlugs = Array.from(new Set(modules.flatMap((m) => m.toolSlugs)));
+  const relTools = toolSlugs
+    .map((s) => toolMap[s])
+    .filter(Boolean);
 
   return (
     <main className="wrap">
       <div className="rel-banner">
-        <Icon name="GraduationCap" size={14} className="inline" /> <b>AI通识课</b> 是一套<b>渐进式学习路径</b>（概念 → 提示词 → 伦理 → 学科应用）；想按教学环节<b>找工具</b>去{" "}
-        <Link href="/scenes">全部场景 <Icon name="ArrowRight" size={12} className="inline" /></Link>，想看老师亲测<b>分步 SOP</b>去{" "}
-        <Link href="/usages">用法库 <Icon name="ArrowRight" size={12} className="inline" /></Link>
+        <Icon name="GraduationCap" size={14} className="inline" /> <b>AI通识课</b>{" "}
+        是「国家平台的课 + 本站的动手练」；只想找工具去{" "}
+        <Link href="/scenes">
+          全部场景 <Icon name="ArrowRight" size={12} className="inline" />
+        </Link>
+        ，只想抄步骤去{" "}
+        <Link href="/usages">
+          用法库 <Icon name="ArrowRight" size={12} className="inline" />
+        </Link>
       </div>
 
       <section className="lit-hero">
         <h1>AI通识课</h1>
         <p>
-          不是又一个工具列表，而是一套<strong>教人搞懂并善用 AI</strong>的课程。无论你是老师想把 AI
-          带进课堂、学生想搞清原理、还是家长想看懂孩子在用啥——跟着四个模块走完，你会对 AI
-          有正确预期、会用、也用得安全。
+          课不是我们讲的。原理课在国家中小学智慧教育平台上，官方、免费、有视频；我们做的是给每节课配一句「你为什么要看」、一段本土化点评，和看完就能上手的分步
+          SOP。
         </p>
         <div className="lit-stats">
           <span>
-            <Icon name="BookOpen" size={13} className="inline" /> 4 个模块
+            <Icon name="BookOpen" size={13} className="inline" /> {modules.length} 个模块
           </span>
           <span>
-            <Icon name="Wrench" size={13} className="inline" /> 6 个配套工具
+            <Icon name="PlayCircle" size={13} className="inline" /> {lessons.length} 节已发布
           </span>
           <span>
-            <Icon name="LinkSimple" size={13} className="inline" /> 每个模块都接真实 SOP
+            <Icon name="LinkSimple" size={13} className="inline" /> {officialCount} 节官方课
+          </span>
+          <span>
+            <Icon name="ListNumbers" size={13} className="inline" /> {sopCount} 条配套 SOP
           </span>
         </div>
+      </section>
+
+      <section className="block">
+        <div className="lit-bridge">
+          <div className="lit-bridge-side">
+            <Icon name="Bank" size={20} className="ic" />
+            <div className="t">国家中小学智慧教育平台</div>
+            <div className="d">讲「是什么 / 为什么」</div>
+            <div className="d">官方 · 免费 · 有视频</div>
+            <div className="u">basic.smartedu.cn ↗</div>
+          </div>
+          <div className="lit-bridge-arrow">
+            <Icon name="ArrowRight" size={20} className="inline" />
+          </div>
+          <div className="lit-bridge-side is-ours">
+            <Icon name="Wrench" size={20} className="ic" />
+            <div className="t">智用笔记（本站）</div>
+            <div className="d">给「打开就能做」的步骤</div>
+            <div className="d">{sopCount} 条 SOP · 一线老师亲测</div>
+            <div className="u">每节课都配好了</div>
+          </div>
+        </div>
+        <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
+          下面每一节，都是「官方课 + 我们配的动手练」的一对。
+        </p>
       </section>
 
       <section className="block">
         <div className="sec-head">
           <div>
             <h2>课程路径</h2>
-            <div className="sub">从概念到落地，循序渐进</div>
+            <div className="sub">
+              {modules.length} 个模块，从建立预期到开学能用
+            </div>
           </div>
         </div>
         <div className="lit-mods">
-          {MODULES.map((m) => (
-            <div className="lit-mod" key={m.num}>
-              <div className="lit-mod-head">
-                <span className="lit-num">{m.num}</span>
-                <div>
-                  <h3>{m.title}</h3>
-                  <p className="muted">{m.desc}</p>
-                </div>
-              </div>
-              <div className="lit-row">
-                <span className="lit-k">相关工具</span>
-                {m.tools.map((s) => {
-                  const t = toolMap[s];
-                  if (!t) return null;
-                  return (
-                    <Link key={s} href={`/tool/${s}`} className="chip-link">
-                      {t.name} <Icon name="ArrowUpRight" size={10} className="inline" />
-                    </Link>
-                  );
-                })}
-              </div>
-              <div className="lit-row">
-                <span className="lit-k">配套 SOP</span>
-                {m.sops.map((sop, i) => (
-                  <Link key={i} href={`/tool/${sop.tool}`} className="sop-link">
-                    ▸ {sop.title}
-                  </Link>
-                ))}
-              </div>
-            </div>
+          {modules.map((m) => (
+            <ModuleCard
+              key={m.slug}
+              module={m}
+              lessons={byModule.get(m.slug) ?? []}
+              tools={(m.toolSlugs.map((s) => toolMap[s]).filter(Boolean) as {
+                slug: string;
+                name: string;
+              }[])}
+            />
           ))}
         </div>
       </section>
@@ -139,19 +137,52 @@ export default async function LiteracyPage() {
       <section className="block">
         <div className="sec-head">
           <div>
-            <h2>本路径相关工具</h2>
-            <div className="sub">点开任一工具，看它的分步使用路径</div>
+            <h2>你现在卡在哪儿？</h2>
+            <div className="sub">直接跳到对症的那一节</div>
           </div>
-          <Link className="link-more" href="/scenes">
-            按场景找更多 <Icon name="ArrowRight" size={12} className="inline" />
-          </Link>
         </div>
-        <div className="tool-grid">
-          {relTools.map((t) => (
-            <ToolCard key={t.slug} tool={t} />
-          ))}
+        <div>
+          {TRIAGE.map((t) => {
+            const m = modules[t.moduleIdx];
+            if (!m) return null;
+            const first = (byModule.get(m.slug) ?? [])
+              .slice()
+              .sort((a, b) => a.order - b.order)[0];
+            if (!first) return null;
+            return (
+              <Link
+                key={t.moduleIdx}
+                href={`/literacy/${first.moduleSlug}/${first.slug}`}
+                className="lit-entry"
+              >
+                <span className="pain">{t.pain}</span>
+                <span className="to">
+                  {m.num}·{first.title} <Icon name="ArrowRight" size={13} className="inline" />
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </section>
+
+      {relTools.length > 0 && (
+        <section className="block">
+          <div className="sec-head">
+            <div>
+              <h2>本路径相关工具</h2>
+              <div className="sub">点开任一工具，看它的分步使用路径</div>
+            </div>
+            <Link className="link-more" href="/scenes">
+              按场景找更多 <Icon name="ArrowRight" size={12} className="inline" />
+            </Link>
+          </div>
+          <div className="tool-grid">
+            {relTools.map((t) => (
+              <ToolCard key={t.slug} tool={t} />
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
