@@ -40,9 +40,9 @@ export default function Header() {
     <header className="header-site">
       <div className="wrap nav">
         <Link href="/" className="brand">
-          <span className="logo">教</span>
+          <span className="logo">智</span>
           <span>
-            教AI导航<span className="brand-logo-sub">·</span>
+            智用笔记<span className="brand-logo-sub">·</span>
           </span>
         </Link>
         <nav className="nav-links">

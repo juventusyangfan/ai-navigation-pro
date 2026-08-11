@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ============================================================
-   教AI导航 · Claymorphism Design System (Style #9)
+   智用笔记 · Claymorphism Design System (Style #9)
    Soft 3D · Playful · Warm · Education-focused
    ============================================================ */
 
@@ -31,6 +31,14 @@
   --color-pink-soft: #FDF2F8;
   --color-violet: #8B5CF6;
   --color-violet-soft: #F5F3FF;
+
+  /* ---- AI 通识课桥接新增（均定义在 token 层，组件内不出现裸值） ---- */
+  --color-secondary: #2DD4BF; /* 填补 .lit-num 的 fallback */
+  --color-official-bg: #F5FAF8; /* 来源说明区底色（中性，= surface-2） */
+  --color-official-border: #CCE8E4; /* 来源说明区边框（= border） */
+  --color-official-fg: #134E4A; /* 来源说明区文字（= text） */
+  --color-link-safe: #0F766E; /* 外链正文色，5.19:1 */
+  --color-warn-fg: #92400E; /* 合规/告警文字色，6.68:1 */
 
   /* ---- Clay Shadows ---- */
   --shadow-clay: inset -2px -2px 6px rgba(0, 0, 0, 0.04), 3px 3px 6px rgba(0, 0, 0, 0.06);
@@ -617,7 +625,7 @@ button {
    SECTIONS
    ============================================================ */
 section.block {
-  padding: 48px 0;
+  padding: 24px 0;
 }
 
 /* ============================================================
@@ -1714,10 +1722,7 @@ section.block {
   font-size: clamp(1.75rem, 4vw, 2.25rem);
   font-weight: 900;
   margin: 0 0 10px;
-  background: linear-gradient(120deg, var(--color-primary), var(--color-violet));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--color-text);
 }
 
 .lit-hero p {
@@ -2229,11 +2234,11 @@ section.block {
 /* Compliance */
 .compliance {
   background: var(--color-amber-soft);
-  border: 2.5px solid rgba(245, 158, 11, 0.25);
+  border: 2.5px solid rgba(146, 64, 14, 0.22);
   border-radius: 12px;
   padding: 14px 16px;
   font-size: 13px;
-  color: var(--color-amber);
+  color: var(--color-warn-fg);
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -2242,6 +2247,252 @@ section.block {
 .compliance .ic {
   font-size: 18px;
   flex-shrink: 0;
+}
+
+/* 安全区内边距（iPhone 刘海/底部），原 BottomNav 引用但未定义 */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ============================================================
+   AI 通识课桥接 · 组件样式（沿用 Claymorphism Token）
+   ============================================================ */
+.lit-hero { position: relative; }
+
+.lit-bridge {
+  background: var(--color-surface);
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-clay);
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+}
+.lit-bridge-side {
+  background: var(--color-surface-2);
+  border: 2.5px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lit-bridge-side.is-ours { border-color: var(--color-primary); }
+.lit-bridge-side .t {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lit-bridge-side .d { font-size: 13px; color: var(--color-muted); line-height: 1.6; }
+.lit-bridge-side .u { font-size: 12px; color: var(--color-link-safe); font-family: var(--font-mono); }
+.lit-bridge-arrow { color: var(--color-primary); display: grid; place-items: center; }
+@media (max-width: 920px) {
+  .lit-bridge { grid-template-columns: 1fr; }
+  .lit-bridge-arrow { transform: rotate(90deg); }
+}
+
+@media (max-width: 640px) {
+  .lit-entry {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-height: 56px;
+  }
+  .lit-entry .to { text-align: left; }
+}
+
+.lit-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 4px;
+  border-bottom: 2px solid var(--color-border);
+  min-height: 56px;
+  color: var(--color-text);
+}
+.lit-entry:last-child { border-bottom: none; }
+.lit-entry .pain { font-size: 14px; line-height: 1.5; }
+.lit-entry .to {
+  flex-shrink: 0;
+  color: var(--color-primary-dark);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-align: right;
+}
+.lit-entry:hover .to { color: var(--color-primary); }
+
+.lit-tag-src {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-muted);
+  border: 1.5px solid var(--color-border);
+  border-radius: 999px;
+  padding: 1px 9px;
+  white-space: nowrap;
+}
+
+.lit-lessons { display: flex; flex-direction: column; }
+.lit-lesson-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 2px solid var(--color-border);
+  min-height: 44px;
+  color: var(--color-text);
+}
+.lit-lesson-row:last-child { border-bottom: none; }
+.lit-lesson-row .n { font-family: var(--font-mono); color: var(--color-primary); }
+.lit-lesson-row .tt { flex: 1; font-size: 14px; }
+.lit-lesson-row:hover .tt { color: var(--color-primary); }
+.lit-lesson-row .m { font-size: 12px; color: var(--color-muted); }
+
+.lit-num-lg {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 22px;
+  font-family: var(--font-heading);
+  flex-shrink: 0;
+}
+
+.lit-source {
+  background: var(--color-official-bg);
+  border: 2px solid var(--color-official-border);
+  border-radius: var(--radius-tag);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-official-fg);
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.lit-source .ic { flex-shrink: 0; margin-top: 2px; color: var(--color-muted); }
+
+.lit-official-cta {
+  background: var(--color-surface-2);
+  border: 2.5px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.lit-official-cta .domain { font-size: 12px; color: var(--color-muted); font-family: var(--font-mono); }
+
+.lit-fallback {
+  background: var(--color-amber-soft);
+  border: 2px solid rgba(146, 64, 14, 0.28);
+  border-radius: var(--radius-tag);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-warn-fg);
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.lit-fallback .ic { flex-shrink: 0; margin-top: 2px; color: var(--color-amber); }
+.lit-fallback .btns { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+
+.lit-back-bar {
+  background: var(--color-primary-soft);
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-btn);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.lit-back-bar .row { display: flex; align-items: center; gap: 6px; }
+.lit-back-bar .acts { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.lit-back-bar .close { margin-left: auto; cursor: pointer; color: var(--color-muted); border: none; background: none; }
+
+.lit-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.lit-nav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-primary-dark);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--radius-btn);
+  border: 2.5px solid var(--color-border);
+}
+.lit-nav-item.is-disabled { color: var(--color-muted); opacity: 0.6; pointer-events: none; }
+.lit-nav-item:hover:not(.is-disabled) { border-color: var(--color-primary); color: var(--color-primary); }
+
+.lit-sticky-cta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 64px;
+  z-index: 45;
+  height: 56px;
+  padding: 8px 16px;
+  background: var(--color-surface);
+  border-top: 3px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lit-sticky-cta .b-primary { flex: 0 0 60%; }
+.lit-sticky-cta .b-ghost { flex: 1; }
+
+/* 主栏卡片纵向堆叠（grid-2 主列内的多个 .card 之间距） */
+.card-stack { display: flex; flex-direction: column; gap: 18px; }
+
+/* 本站点评署名 */
+.lit-take-sign {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 2px solid var(--color-border);
+}
+
+/* 回访条内的「跳到动手练」锚点按钮 */
+.lit-back-bar .go {
+  color: var(--color-primary-dark);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-btn);
+  padding: 6px 12px;
+  min-height: 44px;
+}
+
+@media (min-width: 921px) {
+  .lit-sticky-cta { display: none; }
 }
 
 /* Rate Row */

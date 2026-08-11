@@ -83,7 +83,7 @@ function buildSopText(path: Path): string {
       lines.push("产出示例：", s.outputSample, "");
     }
   });
-  lines.push("—— 来自 教AI导航");
+  lines.push("—— 来自 智用笔记");
   return lines.join("\n");
 }
 
