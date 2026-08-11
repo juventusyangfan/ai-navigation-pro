@@ -19,6 +19,12 @@ async function resolveRef(
     });
     return tool ? { id: tool.id, count: tool.favCount } : null;
   }
+  if (refType === "lesson") {
+    const lesson = await db.litLesson.findFirst({
+      where: { OR: [{ id: refId }, { slug: refId }] },
+    });
+    return lesson ? { id: lesson.id, count: lesson.collectCount } : null;
+  }
   if (refType === "path") {
     const path = await db.sopPath.findFirst({
       where: { OR: [{ id: refId }, { usageId: refId }] },
@@ -96,8 +102,8 @@ export async function POST(req: Request) {
   }
   const refType = String(body?.refType ?? "");
   const refId = String(body?.refId ?? "").trim();
-  if (refType !== "tool" && refType !== "path")
-    return fail(400, "refType 必须为 tool 或 path", { headers: corsAuth() });
+  if (refType !== "tool" && refType !== "path" && refType !== "lesson")
+    return fail(400, "refType 必须为 tool / path / lesson", { headers: corsAuth() });
   if (!refId) return fail(400, "缺少 refId", { headers: corsAuth() });
 
   const target = await resolveRef(refType, refId);

@@ -32,7 +32,7 @@ export default function LoginPage() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={submit}>
-        <h1>教AI导航 · 后台登录</h1>
+        <h1>智用笔记 · 后台登录</h1>
         <p className="sub">内容中台 · 仅限管理员</p>
         <label className="field">
           <span>邮箱</span>

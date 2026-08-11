@@ -24,7 +24,7 @@ export async function generateMetadata({
 }) {
   const { id } = await params;
   const u = await content.getUsage(id);
-  return { title: u ? `${u.title} · 用法库 · 教AI导航` : "用法 · 教AI导航" };
+  return { title: u ? `${u.title} · 用法库 · 智用笔记` : "用法 · 智用笔记" };
 }
 
 export default async function UsageDetailPage({

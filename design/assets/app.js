@@ -1,4 +1,4 @@
-/* 教AI导航 · 原型共享交互逻辑（localStorage 模拟，正式版接 Supabase Auth） */
+/* 智用笔记 · 原型共享交互逻辑（localStorage 模拟，正式版接 Supabase Auth） */
 (function(){
   const KEY_USER='ea_user', KEY_FAV='ea_favs', KEY_NOTE='ea_notes', KEY_FB='ea_fb',
         KEY_USEFUL='ea_useful', KEY_COLLECT='ea_collect';

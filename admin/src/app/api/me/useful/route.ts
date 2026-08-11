@@ -39,8 +39,8 @@ export async function POST(req: Request) {
   }
   const refType = String(body?.refType ?? "");
   const refId = String(body?.refId ?? "").trim();
-  if (refType !== "tool" && refType !== "path")
-    return fail(400, "refType 必须为 tool 或 path", { headers: corsAuth() });
+  if (refType !== "tool" && refType !== "path" && refType !== "lesson")
+    return fail(400, "refType 必须为 tool / path / lesson", { headers: corsAuth() });
   if (!refId) return fail(400, "缺少 refId", { headers: corsAuth() });
 
   // 解析目标资源，取到当前计数
@@ -53,6 +53,13 @@ export async function POST(req: Request) {
     if (!tool) return fail(404, "工具不存在", { headers: corsAuth() });
     currentCount = tool.useful;
     resourceId = tool.id;
+  } else if (refType === "lesson") {
+    const lesson = await db.litLesson.findFirst({
+      where: { OR: [{ id: refId }, { slug: refId }] },
+    });
+    if (!lesson) return fail(404, "伴学课不存在", { headers: corsAuth() });
+    currentCount = lesson.usefulCount;
+    resourceId = lesson.id;
   } else {
     const path = await db.sopPath.findFirst({
       where: { OR: [{ id: refId }, { usageId: refId }] },

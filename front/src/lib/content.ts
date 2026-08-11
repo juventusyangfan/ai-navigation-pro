@@ -85,6 +85,92 @@ export interface Usage {
 }
 
 /* ================================================================
+   AI 通识课桥接（literacy）类型
+   ================================================================ */
+export type LitSource = "official" | "original" | "ugc";
+export type LitLinkStatus = "unchecked" | "ok" | "warn" | "broken";
+
+export interface LitSopRef {
+  id: string; // = 站内 SOP 公开 id（usageId || sopPathId），前端拼 /usages/{id}
+  sopPathId: string; // SOP 路径真外键（后台用，前台一般忽略）
+  title: string;
+  toolSlug: string;
+  toolName: string;
+  estMinutes?: number;
+  level?: string;
+  steps: number;
+  reason?: string;
+}
+
+export interface LitModuleCard {
+  id: string;
+  slug: string;
+  num: string;
+  title: string;
+  summary: string;
+  icon: string;
+  toolSlugs: string[];
+  lessonCount: number;
+  order: number;
+}
+
+export interface LitLessonCard {
+  id: string;
+  slug: string;
+  moduleSlug: string;
+  moduleTitle: string;
+  title: string;
+  hook: string;
+  source: LitSource;
+  stage?: string;
+  durationMin?: number;
+  linkStatus: LitLinkStatus;
+  sopCount: number;
+  order: number;
+}
+
+export interface LitModuleDetail extends LitModuleCard {
+  desc: string;
+  goal?: string;
+  keywords: string[];
+  lessons: LitLessonCard[];
+}
+
+export interface LitLessonDetail extends LitLessonCard {
+  officialUrl?: string;
+  officialProvider?: string;
+  officialColumn?: string;
+  fallbackUrl?: string;
+  archiveNote?: string;
+  guideIntro: string;
+  watchPoints: string[];
+  afterAction: string;
+  editorNote?: string;
+  faq: { q: string; a: string }[];
+  keywords: string[];
+  sops: LitSopRef[];
+  prev?: { slug: string; title: string; moduleSlug: string };
+  next?: { slug: string; title: string; moduleSlug: string };
+  viewCount: number;
+  usefulCount: number;
+  collectCount: number;
+  publishedAt?: string;
+  updatedAt: string;
+}
+
+export interface LitIndex {
+  modules: LitModuleCard[];
+  lessons: LitLessonCard[]; // 全量已发布课时摘要
+}
+
+export interface LitLessonQuery {
+  module?: string;
+  source?: LitSource;
+  stage?: string;
+  limit?: number;
+}
+
+/* ================================================================
    Utility Functions
    ================================================================ */
 
@@ -125,6 +211,13 @@ export interface ContentSource {
   toolsByScene(key: string): Promise<Tool[]>;
   usagesForScene(key: string): Promise<Usage[]>;
   usagesForTool(slug: string): Promise<Usage[]>;
+
+  // —— AI 通识课桥接 ——
+  getLiteracyIndex(): Promise<LitIndex>;
+  getLitModules(): Promise<LitModuleCard[]>;
+  getLitModule(slug: string): Promise<LitModuleDetail | null>;
+  getLitLessons(q?: LitLessonQuery): Promise<LitLessonCard[]>;
+  getLitLesson(slug: string): Promise<LitLessonDetail | null>;
 }
 
 function apiUrl(path: string): string {
@@ -183,6 +276,25 @@ const remoteSource: ContentSource = {
     const list = await remoteSource.getUsages();
     return list.filter((u) => u.tool === slug);
   },
+
+  // —— AI 通识课桥接 ——
+  getLiteracyIndex: () =>
+    safeFetch<LitIndex>(apiUrl("/literacy/index"), { modules: [], lessons: [] }),
+  getLitModules: () =>
+    safeFetch<LitModuleCard[]>(apiUrl("/literacy/modules"), []),
+  getLitModule: (slug: string) =>
+    safeFetch<LitModuleDetail | null>(apiUrl(`/literacy/modules/${slug}`), null),
+  getLitLessons: (q: LitLessonQuery = {}) => {
+    const qs = new URLSearchParams();
+    if (q.module) qs.set("module", q.module);
+    if (q.source) qs.set("source", q.source);
+    if (q.stage) qs.set("stage", q.stage);
+    if (q.limit) qs.set("limit", String(q.limit));
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return safeFetch<LitLessonCard[]>(apiUrl(`/literacy/lessons${suffix}`), []);
+  },
+  getLitLesson: (slug: string) =>
+    safeFetch<LitLessonDetail | null>(apiUrl(`/literacy/lessons/${slug}`), null),
 };
 
 export const content: ContentSource = remoteSource;

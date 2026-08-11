@@ -15,7 +15,7 @@ export type ToggleOutcome =
 /* ---------------- 收藏（工具 / 用法路径多态） ---------------- */
 // refType: "tool" -> refId 传工具 slug；"path" -> refId 传用法 usageId（或 sopPath id）。
 // 与「有用」同范式，工具收藏与路径收藏各自独立记录、各自计数，互不串扰。
-export function useFav(refType: "tool" | "path", refId: string) {
+export function useFav(refType: "tool" | "path" | "lesson", refId: string) {
   const [on, setOn] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -73,7 +73,7 @@ export function useFav(refType: "tool" | "path", refId: string) {
 }
 
 /* ---------------- 有用（工具 / 用法路径） ---------------- */
-export function useUseful(id: string, refType: "tool" | "path" = "path") {
+export function useUseful(id: string, refType: "tool" | "path" | "lesson" = "path") {
   const [on, setOn] = useState(false);
   const [ready, setReady] = useState(false);
 
