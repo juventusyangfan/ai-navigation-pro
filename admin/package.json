@@ -9,6 +9,7 @@
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:literacy": "tsx prisma/seed-literacy.ts",
     "db:init": "prisma db push && tsx prisma/seed.ts",
     "postinstall": "prisma generate"
   },
