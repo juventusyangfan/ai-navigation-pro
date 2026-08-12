@@ -74,6 +74,7 @@ model SopPath {
   order         Int       @default(0)
   usageId       String? // 与 front data.ts 的 USAGES.id 关联（seed 用）
   steps         SopStep[]
+  litLessons    LitLessonSop[] // 通识课伴学页关联（反向关系，纯 Prisma 侧，不生成列）
 }
 
 model SopStep {
@@ -207,7 +208,7 @@ model RolePermission {
   id       String @id @default(cuid())
   roleId   String
   role     Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  resource String // tools|sops|taxonomy|media|ratings|feedback|submissions|users|roles|site|analytics|pushes
+  resource String // tools|sops|taxonomy|media|ratings|feedback|submissions|users|roles|site|analytics|pushes|literacy
   action   String // read|write|delete|review
   @@unique([roleId, resource, action])
 }
@@ -219,4 +220,129 @@ model Push {
   sopPathId     String
   target        String
   sentAt        DateTime @default(now())
+}
+
+// ---------------- AI 通识课桥接（导学层，不存官方正文） ----------------
+// 合规基线：本站只存「官方 URL + 课程元信息 + 本站原创导学」。
+// 本组模型刻意不提供任何可容纳官方课程正文的字段，防止后续被误用为镜像存储。
+
+model LitModule {
+  id        String   @id @default(cuid())
+  slug      String   @unique              // URL 段，如 "what-is-ai"
+  num       String                        // 展示序号，沿用现页面的 "一/二/三/四"
+  title     String
+  summary   String                        // 一句话，列表卡片用
+  desc      String                        // 模块页导语，本站原创
+  icon      String   @default("BookOpen") // Phosphor 图标名，前端 <Icon name={icon} />
+  goal      String?                       // 学完本模块你能做到什么
+  toolSlugs String   @default("[]")       // JSON string[]，模块相关工具 slug
+  keywords  String   @default("[]")       // JSON string[]，SEO 关键词
+  status    String   @default("draft")    // draft|published
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lessons   LitLesson[]
+
+  @@index([status, order])
+}
+
+model LitLesson {
+  id       String    @id @default(cuid())
+  moduleId String
+  module   LitModule @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  slug     String    @unique              // 全局唯一，URL 末段
+  title    String                         // 官方课程标题（元信息，非正文）
+  order    Int       @default(0)
+
+  // —— 来源区分 ——
+  source   String    @default("official") // official|original|ugc
+
+  // —— 官方桥接元信息（source=official 时必填，其余留空） ——
+  officialUrl      String?                // 国家平台课程直达 URL
+  officialProvider String?  @default("国家中小学智慧教育平台")
+  officialCourseId String?                // 平台侧课程标识，改版后据此重新定位
+  officialColumn   String?  @default("学AI")
+  stage            String?                // 学段：小学|初中|高中|通用
+  durationMin      Int?                   // 官方标注时长
+
+  // —— 本站原创导学（页面唯一正文来源，全部人工撰写） ——
+  hook        String                      // 为什么这节值得花时间（≤80 字，卡片摘要）
+  guideIntro  String                      // 导学正文：这节讲什么、教师视角该怎么听
+  watchPoints String  @default("[]")      // JSON string[]，带着这几个问题看
+  afterAction String                      // 看完立刻做什么（衔接 SOP 的过渡文案）
+  editorNote  String?                     // 编辑点评：官方没讲但一线要注意的
+  faq         String  @default("[]")      // JSON {q,a}[]，喂 FAQPage 结构化数据
+  keywords    String  @default("[]")      // JSON string[]
+
+  // —— 外链健康 ——
+  linkStatus    String    @default("unchecked") // unchecked|ok|warn|broken
+  linkCheckedAt DateTime?
+  linkHttpCode  Int?
+  linkFinalUrl  String?                   // 跟随重定向后的落点，与 officialUrl 不同即为改版信号
+  linkFailCount Int       @default(0)     // 连续失败次数，抖动容错
+  fallbackUrl   String?                   // 失效兜底：栏目列表页 / 平台站内搜索页（发布必填）
+  archiveNote   String?                   // 失效时对用户的人工说明
+
+  // —— 发布与计数 ——
+  status         String    @default("draft") // draft|published
+  publishedAt    DateTime?
+  viewCount      Int       @default(0)
+  officialClicks Int       @default(0)    // 外链点击缓存计数（北极星指标）
+  usefulCount    Int       @default(0)    // 与 Useful(refType="lesson") 对齐
+  collectCount   Int       @default(0)    // 与 Favorite(refType="lesson") 对齐
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sops      LitLessonSop[]
+
+  @@index([moduleId, status, order])
+  @@index([status, publishedAt])
+  @@index([linkStatus])
+  @@index([source])
+}
+
+// 伴学课 ←→ 站内 SOP 多对多。
+// 外键打在 SopPath.id（真 FK，级联安全）；对外链接用 usageId || id 现算。
+model LitLessonSop {
+  id        String    @id @default(cuid())
+  lessonId  String
+  lesson    LitLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  sopPathId String
+  sopPath   SopPath   @relation(fields: [sopPathId], references: [id], onDelete: Cascade)
+  order     Int       @default(0)
+  reason    String?                       // 本站原创：为什么这条 SOP 接这节课
+
+  @@unique([lessonId, sopPathId])
+  @@index([sopPathId])
+}
+
+// 匿名/登录用户行为事件。高频写入，刻意不加外键、不进事务。
+model EventLog {
+  id        String   @id @default(cuid())
+  name      String                        // lit_lesson_view | lit_official_click | ...
+  refType   String                        // lesson|module|path|tool
+  refId     String                        // 稳定可读标识：lesson/module 用 slug
+  anonId    String?                       // 前端 localStorage UUID，不含个人信息
+  userId    String?                       // 登录态才有，不建 FK（避免写放大）
+  props     String   @default("{}")       // JSON，事件附加字段
+  ua        String?                       // 截断 120 字符
+  createdAt DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([refType, refId, createdAt])
+  @@index([anonId, name, createdAt])      // 支撑去重
+}
+
+// 每日汇总。看板只读这张表，raw 表滚动保留 30 天。
+model EventDaily {
+  id      String @id @default(cuid())
+  day     String                          // "2026-08-01"（SQLite 无 DATE 类型，存 ISO 字符串）
+  name    String
+  refType String
+  refId   String
+  count   Int    @default(0)
+  uniques Int    @default(0)              // 按 anonId 去重
+
+  @@unique([day, name, refType, refId])
+  @@index([day])
 }

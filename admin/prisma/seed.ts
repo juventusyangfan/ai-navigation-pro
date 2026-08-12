@@ -115,6 +115,9 @@ async function main() {
       { resource: "taxonomy", action: "read" },
       { resource: "taxonomy", action: "write" },
       { resource: "taxonomy", action: "delete" },
+      { resource: "literacy", action: "read" },
+      { resource: "literacy", action: "write" },
+      { resource: "literacy", action: "delete" },
       { resource: "media", action: "read" },
       { resource: "media", action: "write" },
       { resource: "users", action: "read" },
@@ -128,6 +131,7 @@ async function main() {
       { resource: "feedback", action: "review" },
       { resource: "submissions", action: "read" },
       { resource: "submissions", action: "review" },
+      { resource: "literacy", action: "read" },
       { resource: "users", action: "read" },
     ],
     school_admin: [

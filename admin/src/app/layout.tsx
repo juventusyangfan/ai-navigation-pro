@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "教AI导航 · 后台管理",
+  title: "智用笔记 · 后台管理",
   description: "工具库 + SOP 库内容中台",
 };
 

@@ -1,4 +1,4 @@
-/* 教AI导航平台 · 原型生成器
+/* 智用笔记平台 · 原型生成器
  * 运行: node generate.js  -> 产出一堆自包含 HTML（每个页面/每个产品一文件）
  */
 const fs = require('fs');
@@ -243,7 +243,7 @@ const USAGES = [
 /* ---------------- 通用片段 ---------------- */
 const NAV = active => `
 <header class="site"><div class="wrap nav">
-  <a class="brand" href="index.html"><span class="logo">教</span><span>教AI导航<span class="logo-sub">·</span></span></a>
+  <a class="brand" href="index.html"><span class="logo">智</span><span>智用笔记<span class="logo-sub">·</span></span></a>
   <nav class="nav-links">
     <a href="index.html" class="${active==='home'?'active':''}">首页</a>
     <a href="scenes.html" class="${active==='scenes'?'active':''}">全部场景</a>
@@ -260,19 +260,19 @@ const NAV = active => `
 const FOOTER = `
 <footer class="site"><div class="wrap">
   <div class="cols">
-    <div><div class="brand-f"><span class="logo" style="width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--primary),#7c3aed);color:#fff;display:grid;place-items:center">教</span>教AI导航</div>
+    <div><div class="brand-f"><span class="logo" style="width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--primary),#7c3aed);color:#fff;display:grid;place-items:center">智</span>智用笔记</div>
       <p class="desc">教育垂类的 AI 工具导航站：不止帮你找到工具，更教你怎么用在课堂。</p></div>
     <div><h4>导航</h4><a href="index.html">首页</a><a href="scenes.html">全部场景</a><a href="usages.html">用法库</a><a href="ailiteracy.html">AI通识课</a><a href="submit.html">投稿工具</a></div>
     <div><h4>角色</h4><a href="scenes.html?role=teacher">教师</a><a href="scenes.html?role=student">学生</a><a href="scenes.html?role=parent">家长</a><a href="scenes.html?role=admin">学校管理员</a></div>
     <div><h4>关于</h4><a href="#">产品理念</a><a href="#">内容规范</a><a href="#">商务合作</a></div>
   </div>
-  <div class="legal"><span>© 2026 教AI导航 · 原型演示</span><span>教育场景标注适龄与数据风险 · affiliate 明示</span></div>
+  <div class="legal"><span>© 2026 智用笔记 · 原型演示</span><span>教育场景标注适龄与数据风险 · affiliate 明示</span></div>
 </div></footer>`;
 
 const LOGIN_MODAL = `
 <div class="modal-overlay" id="ea-login"><div class="modal">
   <button class="modal-close" aria-label="关闭">×</button>
-  <h3>登录教AI导航</h3><p class="sub">原型用本地模拟登录，正式版将接入账号体系</p>
+  <h3>登录智用笔记</h3><p class="sub">原型用本地模拟登录，正式版将接入账号体系</p>
   <form id="ea-login-form">
     <div class="field"><label>昵称</label><input id="ea-name" placeholder="如：李老师" autocomplete="off"></div>
     <div class="field"><label>我是</label><select id="ea-role"><option value="teacher">教师</option><option value="student">学生</option><option value="parent">家长</option><option value="admin">学校管理员</option></select></div>
@@ -298,7 +298,7 @@ function shell({ title, active, body, page = '', slug = '', extraScript = '' }) 
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} · 教AI导航（原型）</title>
+<title>${esc(title)} · 智用笔记（原型）</title>
 <style>${CSS}</style>
 </head>
 <body data-page="${page}" data-slug="${slug}">
@@ -748,7 +748,7 @@ function renderLogin() {
   <div class="form-wrap" style="margin-top:40px;max-width:420px">
     <div class="card" style="text-align:center">
       <div class="logo" style="width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,var(--primary),#7c3aed);color:#fff;display:grid;place-items:center;font-size:24px;margin:0 auto 14px">教</div>
-      <h2 style="font-size:22px;font-weight:850">登录教AI导航</h2>
+      <h2 style="font-size:22px;font-weight:850">登录智用笔记</h2>
       <p class="muted" style="margin:6px 0 20px">原型用本地模拟登录，正式版接入账号体系</p>
       <form id="login-page-form">
         <div class="field" style="text-align:left"><label>昵称</label><input id="lp-name" placeholder="如：李老师"></div>
