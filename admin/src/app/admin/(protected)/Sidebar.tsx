@@ -13,6 +13,7 @@ const NAV: { group: string; items: { href: string; label: string }[] }[] = [
       { href: "/admin/submissions", label: "投稿审核" },
       { href: "/admin/sops", label: "SOP 编辑器" },
       { href: "/admin/usages", label: "用法库" },
+      { href: "/admin/literacy", label: "AI通识课" },
       { href: "/admin/taxonomy", label: "分类法" },
     ],
   },
@@ -42,7 +43,7 @@ export default function Sidebar({ name, role }: { name: string; role: string }) 
   return (
     <aside className="sidebar">
       <div className="brand">
-        教AI导航 · 后台
+        智用笔记 · 后台
         <small>内容中台 Content CMS</small>
       </div>
       {NAV.map((g) => (

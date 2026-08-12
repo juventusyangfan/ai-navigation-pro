@@ -55,7 +55,7 @@ export default function AdminLoginPage() {
           <div className="login-logo">
             <span className="logo-icon">教</span>
           </div>
-          <h1>教AI导航 · 后台管理</h1>
+          <h1>智用笔记 · 后台管理</h1>
           <p className="login-subtitle">请登录以访问管理后台</p>
         </div>
 

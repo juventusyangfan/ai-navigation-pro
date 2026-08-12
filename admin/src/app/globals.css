@@ -270,3 +270,14 @@ textarea.inp { resize: vertical; min-height: 76px; font-family: var(--mono); }
 .btn.ghost { background: #fff; color: var(--ink); border-color: var(--border); }
 .btn.ghost:hover { background: var(--bg); }
 .btn.block { width: 100%; }
+
+/* ---------- AI 通识课：SOP 多选 ---------- */
+.sop-pick {
+  max-height: 360px; overflow-y: auto; border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px; background: #fff;
+}
+.sop-pick-item {
+  padding: 10px 8px; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.sop-pick-item:last-child { border-bottom: none; }
+.sop-pick .inp { font-size: 13px; }

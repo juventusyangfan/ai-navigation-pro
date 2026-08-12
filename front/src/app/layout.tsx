@@ -27,7 +27,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "教AI导航 · 教育AI工具导航平台",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_ORIGIN ?? "https://eanavi.com"),
+  title: "智用笔记 · 教育AI工具导航平台",
   description:
     "面向老师/学生/家长的教育AI工具导航 + 使用路径SOP平台，找得到、学得会、用得上",
   icons: {

@@ -22,7 +22,7 @@ export async function generateMetadata({
 }) {
   const { key } = await params;
   const sc = await content.getScene(key);
-  return { title: sc ? `${sc.name} · 教AI导航` : "场景 · 教AI导航" };
+  return { title: sc ? `${sc.name} · 智用笔记` : "场景 · 智用笔记" };
 }
 
 export default async function ScenePage({

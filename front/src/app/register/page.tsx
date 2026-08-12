@@ -84,7 +84,7 @@ export default function RegisterPage() {
           >
             教
           </div>
-          <h2 style={{ fontSize: 22, fontWeight: 850 }}>注册教AI导航</h2>
+          <h2 style={{ fontSize: 22, fontWeight: 850 }}>注册智用笔记</h2>
           <p className="muted" style={{ margin: "6px 0 20px" }}>
             填写手机号与信息，创建你的账号
           </p>

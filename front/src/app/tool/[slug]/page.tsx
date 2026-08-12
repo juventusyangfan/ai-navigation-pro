@@ -32,7 +32,7 @@ export async function generateMetadata({
 }) {
   const { slug } = await params;
   const t = await content.getTool(slug);
-  return { title: t ? `${t.name} · 教AI导航` : "工具 · 教AI导航" };
+  return { title: t ? `${t.name} · 智用笔记` : "工具 · 智用笔记" };
 }
 
 export default async function ToolPage({
