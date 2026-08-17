@@ -58,6 +58,7 @@ export default function ModuleEditor() {
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch(`/api/admin/literacy/modules/${id}`)
@@ -90,6 +91,7 @@ export default function ModuleEditor() {
   }, [id]);
 
   function setField<K extends keyof ModuleForm>(k: K, v: string) {
+    setSaved(false);
     setForm((f) => ({ ...f, [k]: v }));
   }
 
@@ -121,8 +123,10 @@ export default function ModuleEditor() {
       body: JSON.stringify(payload),
     });
     setSaving(false);
-    if (res.ok) router.refresh();
-    else {
+    if (res.ok) {
+      setSaved(true);
+      router.refresh();
+    } else {
       const d = await res.json().catch(() => ({}));
       setErr(d.error || "保存失败");
     }
@@ -199,6 +203,7 @@ export default function ModuleEditor() {
         </div>
 
         {err && <div style={{ color: "var(--danger)", fontSize: 13 }}>{err}</div>}
+        {saved && <div style={{ color: "var(--ok, #16a34a)", fontSize: 13 }}>已保存 ✓</div>}
         <button className="btn primary" onClick={save} disabled={saving} style={{ marginTop: 8 }}>
           {saving ? "保存中…" : "保存模块"}
         </button>
