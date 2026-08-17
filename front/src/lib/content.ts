@@ -231,7 +231,7 @@ function apiUrl(path: string): string {
 // 安全 fetch：build 时 admin API 可能不可达，失败返回 null 而非抛错
 async function safeFetch<T>(url: string, fallback: T): Promise<T> {
   try {
-    const r = await fetch(url, { cache: "no-store" });
+    const r = await fetch(url, { cache: "no-cache" });
     if (!r.ok) return fallback;
     return (await r.json()) as T;
   } catch {
