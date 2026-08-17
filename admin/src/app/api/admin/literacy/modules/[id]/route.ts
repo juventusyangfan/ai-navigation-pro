@@ -21,11 +21,15 @@ export async function GET(_req: Request, { params }: Ctx) {
 export async function PATCH(req: Request, { params }: Ctx) {
   const guard = await requireAdmin("literacy", "write");
   if (guard.error) return guard.error;
-  const { id } = await params;
-  const existing = await db.litModule.findUnique({ where: { id } });
-  if (!existing) return fail(404, "模块不存在");
 
-  const b = await req.json();
+  try {
+    const { id } = await params;
+    const existing = await db.litModule.findUnique({ where: { id } });
+    if (!existing) return fail(404, "模块不存在");
+
+    const b = await req.json().catch(() => {
+      throw new Error("请求体格式错误");
+    });
   const merged: Record<string, unknown> = {
     slug: b.slug ?? existing.slug,
     num: b.num ?? existing.num,
@@ -64,6 +68,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
     },
   });
   return ok(litModuleToCard(m));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "更新模块失败";
+    return fail(500, msg);
+  }
 }
 
 export async function DELETE(_req: Request, { params }: Ctx) {
