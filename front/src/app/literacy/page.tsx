@@ -87,23 +87,33 @@ export default async function LiteracyPage() {
 
       <section className="block">
         <div className="lit-bridge">
-          <div className="lit-bridge-side">
+          <Link
+            className="lit-bridge-side"
+            href="https://basic.smartedu.cn/AIEducation/list?content_id=1423337d-b3bd-4b92-855e-e137f330619a"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <Icon name="Bank" size={20} className="ic" />
             <div className="t">国家中小学智慧教育平台</div>
             <div className="d">讲「是什么 / 为什么」</div>
             <div className="d">官方 · 免费 · 有视频</div>
             <div className="u">basic.smartedu.cn ↗</div>
-          </div>
+          </Link>
           <div className="lit-bridge-arrow">
             <Icon name="ArrowRight" size={20} className="inline" />
           </div>
-          <div className="lit-bridge-side is-ours">
+          <Link
+            className="lit-bridge-side is-ours"
+            href="https://www.eanavi.com/usages"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <Icon name="Wrench" size={20} className="ic" />
             <div className="t">智用笔记（本站）</div>
             <div className="d">给「打开就能做」的步骤</div>
             <div className="d">{sopCount} 条 SOP · 一线老师亲测</div>
             <div className="u">每节课都配好了</div>
-          </div>
+          </Link>
         </div>
         <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
           下面每一节，都是「官方课 + 我们配的动手练」的一对。
