@@ -81,6 +81,7 @@ export default function LessonEditor() {
   const [saving, setSaving] = useState(false);
   const [savingSop, setSavingSop] = useState(false);
   const [err, setErr] = useState("");
+  const [saved, setSaved] = useState(false);
   const [linkInfo, setLinkInfo] = useState<string>("");
 
   useEffect(() => {
@@ -130,6 +131,7 @@ export default function LessonEditor() {
   }, [id]);
 
   function setField<K extends keyof LessonForm>(k: K, v: string) {
+    setSaved(false);
     setForm((f) => ({ ...f, [k]: v }));
   }
 
@@ -193,8 +195,10 @@ export default function LessonEditor() {
       body: JSON.stringify(payload),
     });
     setSaving(false);
-    if (res.ok) router.refresh();
-    else {
+    if (res.ok) {
+      setSaved(true);
+      router.refresh();
+    } else {
       const d = await res.json().catch(() => ({}));
       setErr(d.error || "保存失败");
     }
@@ -209,8 +213,10 @@ export default function LessonEditor() {
       body: JSON.stringify({ sops: assoc.map((a) => ({ sopPathId: a.sopPathId, reason: a.reason || null })) }),
     });
     setSavingSop(false);
-    if (res.ok) router.refresh();
-    else {
+    if (res.ok) {
+      setSaved(true);
+      router.refresh();
+    } else {
       const d = await res.json().catch(() => ({}));
       setErr(d.error || "保存 SOP 关联失败");
     }
@@ -246,6 +252,7 @@ export default function LessonEditor() {
       </div>
 
       {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>{err}</div>}
+      {saved && <div style={{ color: "var(--ok, #16a34a)", fontSize: 13, marginBottom: 8 }}>已保存 ✓</div>}
 
       <div className="grid cols-2" style={{ alignItems: "start" }}>
         <div className="card">

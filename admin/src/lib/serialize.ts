@@ -123,6 +123,7 @@ export interface LitModuleCard {
   toolSlugs: string[];
   lessonCount: number;
   order: number;
+  status: string;
 }
 
 export interface LitLessonCard {
@@ -138,6 +139,7 @@ export interface LitLessonCard {
   linkStatus: LitLinkStatus;
   sopCount: number;
   order: number;
+  status: string;
 }
 
 type LitModuleWithCount = LitModule & { _count?: { lessons: number } };
@@ -160,6 +162,7 @@ export function litModuleToCard(
     toolSlugs: arr(m.toolSlugs),
     lessonCount: m._count?.lessons ?? 0,
     order: m.order,
+    status: m.status,
   };
 }
 
@@ -200,6 +203,7 @@ export function litLessonToCard(
     linkStatus: l.linkStatus as LitLinkStatus,
     sopCount: l._count?.sops ?? 0,
     order: l.order,
+    status: l.status,
   };
 }
 
