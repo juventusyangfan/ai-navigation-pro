@@ -11,9 +11,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
     include: { paths: { include: { steps: true }, orderBy: { order: "asc" } } },
   });
   if (!tool || tool.status !== "published") return fail(404, "工具不存在");
-  return ok(toolToApi(tool), { headers: corsHeaders() });
+  return ok(toolToApi(tool), { headers: await corsHeaders() });
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }

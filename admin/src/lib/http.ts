@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { db } from "./db";
 import { getSessionPayload } from "./auth";
 import { userCan, type AdminWithRole } from "./rbac";
@@ -39,15 +40,27 @@ export async function requireAdmin(
   return { admin };
 }
 
-/** 公开内容 API 的 CORS 头（白名单由 NEXT_PUBLIC_SITE_ORIGIN 配置） */
-export function corsHeaders() {
-  const origin = process.env.NEXT_PUBLIC_SITE_ORIGIN?.replace(/\/+$/, "") ?? "*";
+/** 公开内容 API 的 CORS 头（白名单由 NEXT_PUBLIC_SITE_ORIGIN 配置，支持逗号分隔多域名） */
+export async function corsHeaders() {
+  const allowedOrigins = (process.env.NEXT_PUBLIC_SITE_ORIGIN ?? "")
+    .split(",")
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  let reqOrigin = "";
+  try { reqOrigin = (await headers()).get("origin") ?? ""; } catch { /* 非请求上下文 */ }
+  const origin = allowedOrigins.includes(reqOrigin) ? reqOrigin : (allowedOrigins[0] ?? "*");
   return { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "GET,OPTIONS" };
 }
 
-/** 公开鉴权 API 的 CORS 头（允许跨域 POST + 预检，供前台 :3000 调用） */
-export function corsAuth() {
-  const origin = process.env.NEXT_PUBLIC_SITE_ORIGIN?.replace(/\/+$/, "") ?? "*";
+/** 公开鉴权 API 的 CORS 头（允许跨域 POST + 预检，白名单由 NEXT_PUBLIC_SITE_ORIGIN 配置，支持逗号分隔多域名） */
+export async function corsAuth() {
+  const allowedOrigins = (process.env.NEXT_PUBLIC_SITE_ORIGIN ?? "")
+    .split(",")
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  let reqOrigin = "";
+  try { reqOrigin = (await headers()).get("origin") ?? ""; } catch { /* 非请求上下文 */ }
+  const origin = allowedOrigins.includes(reqOrigin) ? reqOrigin : (allowedOrigins[0] ?? "*");
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",

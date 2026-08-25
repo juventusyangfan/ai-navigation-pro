@@ -5,7 +5,7 @@ import { ok, fail, corsAuth } from "@/lib/http";
 export const dynamic = "force-dynamic";
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsAuth() });
+  return new Response(null, { status: 204, headers: await corsAuth() });
 }
 
 // GET /api/me/ratings?slug=xxx -> { on, score, average }
@@ -15,10 +15,10 @@ export async function OPTIONS() {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const slug = searchParams.get("slug");
-  if (!slug) return ok({ on: false, score: null, average: 0 }, { headers: corsAuth() });
+  if (!slug) return ok({ on: false, score: null, average: 0 }, { headers: await corsAuth() });
 
   const tool = await db.tool.findFirst({ where: { OR: [{ id: slug }, { slug }] } });
-  if (!tool) return fail(404, "工具不存在", { headers: corsAuth() });
+  if (!tool) return fail(404, "工具不存在", { headers: await corsAuth() });
 
   const me = await getMe(req);
   let score: number | null = null;
@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   }
   return ok(
     { on: score != null, score, average: tool.rating },
-    { headers: corsAuth() },
+    { headers: await corsAuth() },
   );
 }
 
@@ -40,22 +40,22 @@ export async function GET(req: Request) {
 //   即「评分 = 所有打分者所打分后的平均分」。
 export async function POST(req: Request) {
   const me = await getMe(req);
-  if (!me) return fail(401, "请先登录后再评分", { headers: corsAuth() });
+  if (!me) return fail(401, "请先登录后再评分", { headers: await corsAuth() });
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return fail(400, "请求体格式错误", { headers: corsAuth() });
+    return fail(400, "请求体格式错误", { headers: await corsAuth() });
   }
   const slug = String(body?.slug ?? "").trim();
   const score = Number(body?.score);
-  if (!slug) return fail(400, "缺少 slug", { headers: corsAuth() });
+  if (!slug) return fail(400, "缺少 slug", { headers: await corsAuth() });
   if (!Number.isFinite(score) || score < 0 || score > 5)
-    return fail(400, "评分需在 0~5 之间", { headers: corsAuth() });
+    return fail(400, "评分需在 0~5 之间", { headers: await corsAuth() });
 
   const tool = await db.tool.findFirst({ where: { OR: [{ id: slug }, { slug }] } });
-  if (!tool) return fail(404, "工具不存在", { headers: corsAuth() });
+  if (!tool) return fail(404, "工具不存在", { headers: await corsAuth() });
   const toolId = tool.id;
 
   const existing = await db.rating.findUnique({
@@ -78,6 +78,6 @@ export async function POST(req: Request) {
 
   return ok(
     { on: score !== 0, score: score !== 0 ? score : null, average },
-    { headers: corsAuth() },
+    { headers: await corsAuth() },
   );
 }

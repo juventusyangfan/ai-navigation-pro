@@ -26,10 +26,10 @@ export async function GET() {
         litLessonToCard(l, l.module.slug, l.module.title),
       ),
     },
-    { headers: corsHeaders() },
+    { headers: await corsHeaders() },
   );
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }

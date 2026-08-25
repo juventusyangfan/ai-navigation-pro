@@ -69,10 +69,10 @@ export async function GET(
       lesson.module.title,
       { prev, next },
     ),
-    { headers: corsHeaders() },
+    { headers: await corsHeaders() },
   );
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }

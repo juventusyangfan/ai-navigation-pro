@@ -12,9 +12,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     include: { steps: true, tool: true },
   });
   if (!path) return fail(404, "用法不存在");
-  return ok(usageToApi(path), { headers: corsHeaders() });
+  return ok(usageToApi(path), { headers: await corsHeaders() });
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }

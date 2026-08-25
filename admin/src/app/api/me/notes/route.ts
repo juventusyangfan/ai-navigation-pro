@@ -5,14 +5,14 @@ import { ok, fail, corsAuth } from "@/lib/http";
 export const dynamic = "force-dynamic";
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsAuth() });
+  return new Response(null, { status: 204, headers: await corsAuth() });
 }
 
 // GET /api/me/notes?refType&refId -> { content }（单条，供 NoteBox 挂载时回填）
 // GET /api/me/notes            -> { items:[{refType,refId,content,ts}] }（全部，供个人中心）
 export async function GET(req: Request) {
   const me = await getMe(req);
-  if (!me) return fail(401, "请先登录", { headers: corsAuth() });
+  if (!me) return fail(401, "请先登录", { headers: await corsAuth() });
 
   const { searchParams } = new URL(req.url);
   const refType = searchParams.get("refType");
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     const n = await db.note.findUnique({
       where: { userId_refType_refId: { userId: me.id, refType, refId } },
     });
-    return ok({ content: n?.content ?? "" }, { headers: corsAuth() });
+    return ok({ content: n?.content ?? "" }, { headers: await corsAuth() });
   }
 
   const items = await db.note.findMany({
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
         ts: n.updatedAt.getTime(),
       })),
     },
-    { headers: corsAuth() },
+    { headers: await corsAuth() },
   );
 }
 
@@ -46,24 +46,24 @@ export async function GET(req: Request) {
 //   按 (userId, refType, refId) upsert——同一资源只保留最新一份笔记。
 export async function POST(req: Request) {
   const me = await getMe(req);
-  if (!me) return fail(401, "请先登录后再保存笔记", { headers: corsAuth() });
+  if (!me) return fail(401, "请先登录后再保存笔记", { headers: await corsAuth() });
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return fail(400, "请求体格式错误", { headers: corsAuth() });
+    return fail(400, "请求体格式错误", { headers: await corsAuth() });
   }
   const refType = String(body?.refType ?? "").trim();
   const refId = String(body?.refId ?? "").trim();
   const content = String(body?.content ?? "");
 
-  if (!refType || !refId) return fail(400, "缺少 refType / refId", { headers: corsAuth() });
+  if (!refType || !refId) return fail(400, "缺少 refType / refId", { headers: await corsAuth() });
 
   await db.note.upsert({
     where: { userId_refType_refId: { userId: me.id, refType, refId } },
     create: { userId: me.id, refType, refId, content },
     update: { content },
   });
-  return ok({ ok: true }, { headers: corsAuth() });
+  return ok({ ok: true }, { headers: await corsAuth() });
 }
