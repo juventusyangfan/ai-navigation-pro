@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { ok, fail } from "@/lib/http";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -8,9 +9,15 @@ export const dynamic = "force-dynamic";
 const GUEST_EMAIL = "guest-submission@system.local";
 
 // 投稿为跨域 POST（前台 :3000 → 后台 :3001），需显式放行 POST 与 Content-Type，
-// 否则浏览器预检（OPTIONS）会被拒。
-function corsHeaders(): Record<string, string> {
-  const origin = process.env.NEXT_PUBLIC_SITE_ORIGIN || "*";
+// 否则浏览器预检（OPTIONS）会被拒。白名单由 NEXT_PUBLIC_SITE_ORIGIN 配置，支持逗号分隔多域名。
+async function corsHeaders(): Promise<Record<string, string>> {
+  const allowedOrigins = (process.env.NEXT_PUBLIC_SITE_ORIGIN ?? "")
+    .split(",")
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  let reqOrigin = "";
+  try { reqOrigin = (await headers()).get("origin") ?? ""; } catch { /* 非请求上下文 */ }
+  const origin = allowedOrigins.includes(reqOrigin) ? reqOrigin : (allowedOrigins[0] ?? "*");
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
@@ -56,12 +63,12 @@ export async function POST(req: Request) {
 
   return ok(
     { id: submission.id, status: submission.status },
-    { headers: corsHeaders() },
+    { headers: await corsHeaders() },
   );
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }
 
 export async function GET() {

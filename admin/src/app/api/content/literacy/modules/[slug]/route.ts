@@ -23,10 +23,10 @@ export async function GET(
   if (!m) return fail(404, "模块不存在");
   return ok(
     litModuleToDetail(m as Parameters<typeof litModuleToDetail>[0]),
-    { headers: corsHeaders() },
+    { headers: await corsHeaders() },
   );
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }

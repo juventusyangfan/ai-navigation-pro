@@ -19,9 +19,9 @@ export async function GET(req: Request) {
   if (role) list = list.filter((u) => u.role === role);
   if (toolSlug) list = list.filter((u) => u.tool === toolSlug);
 
-  return ok(list, { headers: corsHeaders() });
+  return ok(list, { headers: await corsHeaders() });
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }

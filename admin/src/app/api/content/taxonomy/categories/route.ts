@@ -11,9 +11,9 @@ export async function GET() {
   for (const c of cats) {
     map[c.key] = { icon: c.icon, phase: c.phase, desc: c.desc };
   }
-  return ok(map, { headers: corsHeaders() });
+  return ok(map, { headers: await corsHeaders() });
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }

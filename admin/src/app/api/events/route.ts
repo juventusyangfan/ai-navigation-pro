@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return new Response(null, { status: 204, headers: corsAuth() });
+    return new Response(null, { status: 204, headers: await corsAuth() });
   }
 
   const events = Array.isArray(body.events) ? body.events.slice(0, 20) : [];
@@ -106,9 +106,9 @@ export async function POST(req: Request) {
   }
 
   // 恒定 204，不返回任何数据
-  return new Response(null, { status: 204, headers: corsAuth() });
+  return new Response(null, { status: 204, headers: await corsAuth() });
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsAuth() });
+  return new Response(null, { status: 204, headers: await corsAuth() });
 }

@@ -16,9 +16,9 @@ export async function GET(
   if (!tool) return fail(404, "工具不存在");
   const path = tool.paths.find((p) => p.id === pathId || p.usageId === pathId);
   if (!path) return fail(404, "SOP 路径不存在");
-  return ok(pathToApi(path), { headers: corsHeaders() });
+  return ok(pathToApi(path), { headers: await corsHeaders() });
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }
