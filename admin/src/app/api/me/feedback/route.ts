@@ -5,7 +5,7 @@ import { ok, fail, corsAuth } from "@/lib/http";
 export const dynamic = "force-dynamic";
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsAuth() });
+  return new Response(null, { status: 204, headers: await corsAuth() });
 }
 
 // GET /api/me/feedback -> 当前登录用户提交的反馈列表（含工具名、状态）
@@ -13,7 +13,7 @@ export async function OPTIONS() {
 // 故此处不使用 include，避免 Prisma 报 "Unknown field"；改为单独查关联表。
 export async function GET(req: Request) {
   const me = await getMe(req);
-  if (!me) return fail(401, "请先登录", { headers: corsAuth() });
+  if (!me) return fail(401, "请先登录", { headers: await corsAuth() });
 
   const items = await db.feedback.findMany({
     where: { userId: me.id },
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
         ts: f.createdAt.getTime(),
       })),
     },
-    { headers: corsAuth() },
+    { headers: await corsAuth() },
   );
 }
 
@@ -49,28 +49,28 @@ export async function GET(req: Request) {
 //   type: "纠错" | "建议"；text 非空、≤2000 字。落库 Feedback 表（status=pending）。
 export async function POST(req: Request) {
   const me = await getMe(req);
-  if (!me) return fail(401, "请先登录后再提交反馈", { headers: corsAuth() });
+  if (!me) return fail(401, "请先登录后再提交反馈", { headers: await corsAuth() });
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return fail(400, "请求体格式错误", { headers: corsAuth() });
+    return fail(400, "请求体格式错误", { headers: await corsAuth() });
   }
   const slug = String(body?.slug ?? "").trim();
   const type = String(body?.type ?? "").trim();
   const text = String(body?.text ?? "").trim();
 
-  if (!slug) return fail(400, "缺少 slug", { headers: corsAuth() });
-  if (type !== "纠错" && type !== "建议") return fail(400, "反馈类型不合法", { headers: corsAuth() });
-  if (!text) return fail(400, "反馈内容不能为空", { headers: corsAuth() });
-  if (text.length > 2000) return fail(400, "反馈内容过长（≤2000 字）", { headers: corsAuth() });
+  if (!slug) return fail(400, "缺少 slug", { headers: await corsAuth() });
+  if (type !== "纠错" && type !== "建议") return fail(400, "反馈类型不合法", { headers: await corsAuth() });
+  if (!text) return fail(400, "反馈内容不能为空", { headers: await corsAuth() });
+  if (text.length > 2000) return fail(400, "反馈内容过长（≤2000 字）", { headers: await corsAuth() });
 
   const tool = await db.tool.findFirst({ where: { OR: [{ id: slug }, { slug }] } });
-  if (!tool) return fail(404, "工具不存在", { headers: corsAuth() });
+  if (!tool) return fail(404, "工具不存在", { headers: await corsAuth() });
 
   const created = await db.feedback.create({
     data: { userId: me.id, toolId: tool.id, type, text },
   });
-  return ok({ id: created.id, status: created.status }, { headers: corsAuth() });
+  return ok({ id: created.id, status: created.status }, { headers: await corsAuth() });
 }

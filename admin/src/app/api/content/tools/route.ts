@@ -26,9 +26,9 @@ export async function GET(req: Request) {
   if (sort === "rating") list.sort((a, b) => b.rating - a.rating);
   else if (sort === "name") list.sort((a, b) => a.name.localeCompare(b.name, "zh"));
 
-  return ok(list, { headers: corsHeaders() });
+  return ok(list, { headers: await corsHeaders() });
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }

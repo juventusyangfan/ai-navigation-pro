@@ -5,7 +5,7 @@ import { ok, fail, corsAuth } from "@/lib/http";
 export const dynamic = "force-dynamic";
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsAuth() });
+  return new Response(null, { status: 204, headers: await corsAuth() });
 }
 
 // 解析收藏目标：tool 按 id 或 slug；path 按 id 或 usageId。返回真实 DB id 与当前计数。
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
 
   if (slug) {
     const target = await resolveRef("tool", slug);
-    if (!target) return ok({ on: false, count: 0 }, { headers: corsAuth() });
+    if (!target) return ok({ on: false, count: 0 }, { headers: await corsAuth() });
     const on = me
       ? !!(await db.favorite.findUnique({
           where: {
@@ -55,12 +55,12 @@ export async function GET(req: Request) {
           },
         }))
       : false;
-    return ok({ on, count: target.count }, { headers: corsAuth() });
+    return ok({ on, count: target.count }, { headers: await corsAuth() });
   }
 
   if (refType && refId) {
     const target = await resolveRef(refType, refId);
-    if (!target) return ok({ on: false, count: 0 }, { headers: corsAuth() });
+    if (!target) return ok({ on: false, count: 0 }, { headers: await corsAuth() });
     const on = me
       ? !!(await db.favorite.findUnique({
           where: {
@@ -68,7 +68,7 @@ export async function GET(req: Request) {
           },
         }))
       : false;
-    return ok({ on, count: target.count }, { headers: corsAuth() });
+    return ok({ on, count: target.count }, { headers: await corsAuth() });
   }
 
   // 无参数：返回收藏的工具 slug 和用法 path id 列表（个人中心「我的收藏」）
@@ -86,28 +86,28 @@ export async function GET(req: Request) {
         })
       ).map((f) => f.refId)
     : [];
-  return ok({ slugs: toolSlugs, pathIds }, { headers: corsAuth() });
+  return ok({ slugs: toolSlugs, pathIds }, { headers: await corsAuth() });
 }
 
 // POST /api/me/favorites  body: { refType: "tool"|"path", refId } -> 切换收藏，返回 { on, count }
 export async function POST(req: Request) {
   const me = await getMe(req);
-  if (!me) return fail(401, "请先登录后再收藏", { headers: corsAuth() });
+  if (!me) return fail(401, "请先登录后再收藏", { headers: await corsAuth() });
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return fail(400, "请求体格式错误", { headers: corsAuth() });
+    return fail(400, "请求体格式错误", { headers: await corsAuth() });
   }
   const refType = String(body?.refType ?? "");
   const refId = String(body?.refId ?? "").trim();
   if (refType !== "tool" && refType !== "path" && refType !== "lesson")
-    return fail(400, "refType 必须为 tool / path / lesson", { headers: corsAuth() });
-  if (!refId) return fail(400, "缺少 refId", { headers: corsAuth() });
+    return fail(400, "refType 必须为 tool / path / lesson", { headers: await corsAuth() });
+  if (!refId) return fail(400, "缺少 refId", { headers: await corsAuth() });
 
   const target = await resolveRef(refType, refId);
-  if (!target) return fail(404, "目标不存在", { headers: corsAuth() });
+  if (!target) return fail(404, "目标不存在", { headers: await corsAuth() });
 
   const existing = await db.favorite.findUnique({
     where: { userId_refType_refId: { userId: me.id, refType, refId } },
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
     ]);
     return ok(
       { on: false, count: Math.max(0, target.count - 1) },
-      { headers: corsAuth() },
+      { headers: await corsAuth() },
     );
   }
 
@@ -146,6 +146,6 @@ export async function POST(req: Request) {
   ]);
   return ok(
     { on: true, count: target.count + 1 },
-    { headers: corsAuth() },
+    { headers: await corsAuth() },
   );
 }

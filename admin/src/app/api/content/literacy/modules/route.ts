@@ -10,9 +10,9 @@ export async function GET() {
     orderBy: { order: "asc" },
     include: { _count: { select: { lessons: true } } },
   });
-  return ok(modules.map(litModuleToCard), { headers: corsHeaders() });
+  return ok(modules.map(litModuleToCard), { headers: await corsHeaders() });
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: await corsHeaders() });
 }
