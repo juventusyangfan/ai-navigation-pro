@@ -1,0 +1,24 @@
+{
+  "name": "h5-speaking-test",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "H5 移动端英语听说测评（最小可用版）：测评页 + 结果分析页",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "check": "node scripts/check-node.mjs",
+    "server": "node server/index.mjs",
+    "dev": "node scripts/check-node.mjs && vite --host",
+    "build": "node scripts/check-node.mjs && vite build",
+    "preview": "node scripts/check-node.mjs && vite preview --host"
+  },
+  "dependencies": {
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^5.4.11"
+  }
+}
