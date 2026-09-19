@@ -252,12 +252,12 @@ export default function SopPathView({
                     <span>{s.pitfall}</span>
                   </div>
                 )}
-                {s.branch && s.branch.length > 0 && (
+                {s.branch && Array.isArray(s.branch) && s.branch.length > 0 && (
                   <div className="branch">
                     <div className="branch-head">
                       <Icon name="GitBranch" size={14} className="inline" /> 决策分支
                     </div>
-                    {s.branch.map((b, bi) => (
+                    {s.branch.map((b: { when: string; then: string }, bi: number) => (
                       <div className="branch-item" key={bi}>
                         <span className="branch-when">若 {b.when}</span>
                         <span className="branch-then">{b.then}</span>
