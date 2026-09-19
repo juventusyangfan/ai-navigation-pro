@@ -17,10 +17,20 @@ echo "[2/4] 安装/更新依赖"
 cd "${H5_DIR}"
 npm install --no-audit --no-fund
 
-echo "[3/4] 构建静态资源"
+echo "[3/5] 构建静态资源"
 npm run build
 
-echo "[4/4] 重载 Nginx"
+echo "[4/5] 启动/保活密钥服务（智聆 SDK 需 /api/soe/credential）"
+if command -v pm2 >/dev/null 2>&1; then
+  pm2 describe h5-soe-cred >/dev/null 2>&1 && pm2 restart h5-soe-cred || pm2 start server/index.mjs --name h5-soe-cred
+else
+  # 无 pm2 时以 nohup 保活（生产建议用 pm2 / systemd 托管，避免进程退出）
+  if ! pgrep -f "server/index.mjs" >/dev/null 2>&1; then
+    nohup node server/index.mjs > /var/log/h5-soe-cred.log 2>&1 &
+  fi
+fi
+
+echo "[5/5] 重载 Nginx"
 sudo nginx -t && sudo systemctl reload nginx
 
 echo "完成：站点目录 ${SITE_ROOT}"

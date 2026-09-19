@@ -58,7 +58,7 @@ async function fetchStsCredential() {
     'STS 未启用：请安装 tencentcloud-sdk-nodejs-sts 并在此处实现 GetFederationToken（生产环境必须走临时密钥）'
   )
   // 参考实现（安装 SDK 后取消注释并删除上面的 throw）：
-  // const sts = require('tencentcloud-sdk-nodejs-sts').sts
+  // import stsPkg from 'tencentcloud-sdk-nodejs-sts'; const sts = stsPkg.sts
   // const client = new sts.v20180813.Client({
   //   credential: { secretId: SECRET_ID, secretKey: SECRET_KEY },
   //   region: 'ap-guangzhou', profile: { httpProfile: { endpoint: 'sts.tencentcloudapi.com' } }

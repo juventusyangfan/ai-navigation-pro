@@ -181,10 +181,12 @@ export function normalizeResult(res) {
 }
 
 /**
- * 发起一次「模仿朗读」评测（eval_mode=2 段落模式）。
+ * 发起一次智聆口语评测（默认 eval_mode=2 段落模式，与 2026-09-18 调试记录一致）。
+ * 全体验卷的口语题（模仿朗读 / 情景交际 / 信息转述）统一走本方法，
+ * 仅 ref_text 因题型不同而变化；初始化参数与调试记录保持一致。
  * @returns {{done: Promise<object>, stop: Function, getAudio: Function}}
  */
-export async function startReadAloud({ refText, scoreCoeff = 2.5, onChange } = {}) {
+export async function startReadAloud({ refText, evalMode = 2, scoreCoeff = 2.5, onChange } = {}) {
   const Sdk = await loadSoeSdk()
   const cred = await fetchCredential()
 
@@ -194,7 +196,7 @@ export async function startReadAloud({ refText, scoreCoeff = 2.5, onChange } = {
     secretkey: cred.secretkey || '',
     token: cred.token || '',
     server_engine_type: '16k_en',
-    eval_mode: 2,
+    eval_mode: evalMode,
     ref_text: refText,
     score_coeff: scoreCoeff,
     sentence_info_enabled: 1,
