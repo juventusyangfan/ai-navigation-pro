@@ -14,7 +14,7 @@
         </div>
         <p class="muted small">
           {{ new Date(result.createdAt).toLocaleString('zh-CN') }}
-          <span class="badge">模拟评分</span>
+          <span class="badge">智聆真评</span>
         </p>
       </section>
 
@@ -49,7 +49,7 @@
                 <template v-else>
                   录音 {{ it.detail.durationSec }}s（建议 {{ it.detail.expectedSec }}s）·
                   准确 {{ it.detail.accuracy }} · 流利 {{ it.detail.fluency }} · 完整
-                  {{ it.detail.completion }} · 要点 {{ it.detail.content }}
+                  {{ it.detail.completion }} · 综合 {{ it.detail.suggested }}
                 </template>
               </p>
               <div v-if="getAudio(it.id)" class="playback">
