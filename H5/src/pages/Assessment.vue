@@ -106,7 +106,7 @@
               :disabled="prepareLeft > 0"
               @click="startRecord"
             >
-              {{ answers[current.id]?.rec ? '重新录音' : '开始录音' }}
+              {{ answers[current.id]?.rec || answers[current.id]?.attempted ? '重新录音' : '开始录音' }}
             </button>
             <button v-else class="btn btn-stop btn-block" @click="stopRecord">结束录音</button>
 
@@ -119,6 +119,9 @@
               </span>
               <span v-if="playError" class="error small">{{ playError }}</span>
             </div>
+            <p v-else-if="answers[current.id]?.attempted" class="muted small">
+              本次录音过短或未采集到音频，暂无法试听。
+            </p>
           </div>
         </template>
       </section>
@@ -145,7 +148,7 @@ import { computed, onUnmounted, reactive, ref, toRaw } from 'vue'
 import { GRADES, getPaper } from '../data/paper.js'
 import { navigate } from '../router.js'
 import { play, stopAll, ttsSupported } from '../services/audioPlayer.js'
-import { startReadAloud, pcmToWav } from '../services/soeSdk.js'
+import { startReadAloud, pcmToWav, toArrayBuffer } from '../services/soeSdk.js'
 import { playRecorded, stopPlayback } from '../services/player.js'
 import { buildResult } from '../services/evaluator.js'
 import { saveResult, setAudio } from '../services/store.js'
@@ -196,7 +199,11 @@ const progressWidth = computed(() => `${((stepIndex.value + 1) / steps.value.len
 const answered = computed(() => {
   const a = answers[current.value.id]
   if (!a) return false
-  return current.value.type === 'choice' ? typeof a.choiceIndex === 'number' : !!a.rec
+  if (current.value.type === 'choice') return typeof a.choiceIndex === 'number'
+  // 口语题：只要评测有结果、或录到音、或已尝试过录音，即视为已作答。
+  // 录音数据(rec)仅用于"能否试听"，不能作为"是否作答"的判据——否则取音频竞态或失败时
+  // 会永久禁用"下一题"把用户锁死在该题。
+  return !!(a.soe || a.rec || a.attempted)
 })
 
 let ctrl = null
@@ -204,13 +211,12 @@ let timer = null
 let prepareTimer = null
 let limitTimer = null
 
-// SDK 返回的 PCM 转 WAV，供结果页 <audio>/WebAudio 回放
-async function pcmToWavRec(pcm) {
-  let buf = null
-  if (pcm instanceof ArrayBuffer) buf = pcm
-  else if (pcm && pcm.buffer instanceof ArrayBuffer) {
-    buf = pcm.buffer.slice(pcm.byteOffset || 0, (pcm.byteOffset || 0) + pcm.byteLength)
-  }
+// SDK 返回的 16k/16bit 单声道 PCM 转 WAV，供本页试听与结果页回放。
+// 注意：SDK 的 getAudio() 回传的**不是** ArrayBuffer，而是 WebRecorder 用
+// `allAudioData.push(...new Int8Array(...))` 累积出来的「普通数组」（实测 2.4s 音频 =
+// 77486 个字节元素）。必须经 toArrayBuffer 归一化，否则录音被判为「无数据」→ 试听按钮不出现。
+function pcmToWavRec(pcm) {
+  const buf = toArrayBuffer(pcm)
   if (!buf) return null
   const blob = pcmToWav(buf)
   const url = URL.createObjectURL(blob)
@@ -336,23 +342,48 @@ async function stopRecord() {
   ctrl = null
   recording.value = false
   evaluating.value = true
+  const id = current.value.id
+  c.stop() // ★ 发送结束信令，服务端收到后回 final:1，c.done 才会 resolve；否则永远卡在「评测中」
+
+  // 不论评测成功与否都取出已录音频，便于试听，并写入 answers 确保「下一题」可用。
+  // 注意：socket 的 final:1 可能早于 recorder 的 onstop，getAudio() 首次可能为空，稍等重取一次。
+  const saveAudio = async () => {
+    // c.stop() 已同步触发 SDK 的 OnRecorderStop 写入音频；个别浏览器会晚一拍，最多重试 4 次
+    for (let i = 0; i < 4; i++) {
+      const rec = pcmToWavRec(c.getAudio())
+      if (rec) return rec
+      await new Promise((r) => setTimeout(r, 150))
+    }
+    return null
+  }
+
   try {
     const soe = await c.done
+    const rec = await saveAudio()
     if (soe && soe.noSpeech) {
-      // 未检测到有效人声：不计分，提示重录
-      error.value = '未检测到有效语音，本次不计分。请确认麦克风已授权、朗读声音稍大一些后重录。'
+      // 未检测到有效人声：不计分，但允许重录或直接进入下一题（不锁死）
+      error.value = '未检测到有效语音，本题未计分。可点「重新录音」再试，或直接进入下一题。'
+      answers[id] = { soe: null, rec, attempted: true, noSpeech: true }
+      if (rec) setAudio(id, rec)
       evaluating.value = false
       return
     }
-    const pcm = c.getAudio()
-    const rec = pcm ? await pcmToWavRec(pcm) : null
-    answers[current.value.id] = { soe, rec }
-    if (rec) setAudio(current.value.id, rec)
+    answers[id] = { soe, rec, attempted: true }
+    if (rec) setAudio(id, rec)
     evaluating.value = false
   } catch (e) {
     const msg = e.message || String(e)
     if (e.isCredential) credError.value = msg
-    else error.value = msg
+    else error.value = msg + '（可点「重新录音」重试，或直接进入下一题）'
+    // 评测失败也标记「已尝试」并保留录音，避免「下一题」被永久禁用而卡死
+    let rec = null
+    try {
+      rec = await saveAudio()
+    } catch (e2) {
+      /* ignore */
+    }
+    answers[id] = { soe: null, rec, attempted: true, error: msg }
+    if (rec) setAudio(id, rec)
     evaluating.value = false
   }
 }
@@ -389,6 +420,15 @@ function clearTimers() {
   clearInterval(prepareTimer)
   clearInterval(timer)
   clearTimeout(limitTimer)
+  // 换题/离开页面时若仍在录音，先发结束信令释放麦克风与服务端会话，避免麦克风常开、会话卡死
+  if (ctrl) {
+    try {
+      ctrl.stop()
+    } catch (e) {
+      /* ignore */
+    }
+    ctrl = null
+  }
 }
 
 onUnmounted(() => {
