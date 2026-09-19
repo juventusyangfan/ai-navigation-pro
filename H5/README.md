@@ -36,22 +36,27 @@ npm run preview  # 预览构建产物，http://localhost:4173
 
 | 路由 | 页面 | 能力 |
 |---|---|---|
-| `#/`（默认） | `src/pages/Assessment.vue` 测评页 | 听力播放（TTS/音频）、口语录音（音量条+计时+回放）、选择题作答、逐题提交，产出结构化作答数据 |
+| `#/`（默认） | `src/pages/Assessment.vue` 测评页 | **年级选择**后加载对应完整试卷；听力播放（TTS/音频）、口语题（模仿朗读/情景交际/信息转述）全部调用智聆真评（SDK 内置录音+评测+计时+回放）、选择题本地判分、逐题提交，产出结构化作答数据 |
 | `#/result` | `src/pages/Result.vue` 结果分析页 | 总分、五大维度得分条、逐题明细与录音回放、规则化改进建议 |
-| `#/readaloud` | `src/pages/ReadAloud.vue` 模仿朗读真评 | **腾讯云智聆口语评测（新版）真实评分**闭环，见第七节 |
 
-体验卷结构（`src/data/paper.js`，满分 30 分，与中考听说框架对齐）：
+试卷数据（`src/data/paper.js`，按年级导出 `GRADES` + `papers` + `getPaper()`），每套含四个题型、与中考听说框架对齐：
 
-1. 听后选择 10 分（2 题）
-2. 模仿朗读 5 分（1 篇）
-3. 情景交际 5 分（1 题口头作答）
-4. 信息转述 10 分（1 题）
+1. 听后选择（客观题，本地判分）
+2. 模仿朗读（智聆评发音）
+3. 情景交际 / 口头表达（智聆评发音，参考范文作 ref_text）
+4. 信息转述（智聆评发音，参考转述范文作 ref_text）
+
+| 年级 | 满分 | 听后选择 | 模仿朗读 | 情景交际 | 信息转述 |
+|---|---|---|---|---|---|
+| 七年级 | 30 | 10（2 题） | 5（1 篇） | 5（1 题） | 10（1 题） |
+| 八年级 | 36 | 12（3 题） | 6（1 篇） | 6（2 题） | 12（1 题） |
+| 九年级 | 40 | 12（3 题） | 8（1 篇） | 8（2 题） | 12（1 题） |
 
 ---
 
 ## 三、部署到腾讯云（沿用现有轻量服务器 + Nginx 子域名方案）
 
-现有服务器已部署 `front(:3000)` / `admin(:3001)`，本项目是**纯静态站点**，不需要 Node 进程、不需要 PM2，只用 Nginx 托管 `dist` 目录。
+现有服务器已部署 `front(:3000)` / `admin(:3001)`。前端仍为纯静态 `dist`，由 Nginx 托管；但智聆评测需要浏览器端拿到密钥，故**额外运行密钥服务** `server/index.mjs`（默认 :8787），并由 Nginx 反代 `/api`（见 `deploy/nginx-h5.conf`）。`deploy/deploy.sh` 已包含「构建 → 启动/保活密钥服务 → 重载 Nginx」三步。
 
 ### 3.1 首次部署
 
@@ -74,6 +79,8 @@ sudo certbot --nginx -d h5.eanavi.com --non-interactive --agree-tos -m your-emai
 # 5) 验证
 curl -I https://h5.eanavi.com    # 期望 200
 ```
+
+> 密钥服务（评测必需）：部署前先 `cp server/.env.example server/.env` 并填入真实 `SOE_APPID / SOE_SECRET_ID / SOE_SECRET_KEY`；`deploy.sh` 会自动用 pm2（或 nohup）保活 `server/index.mjs`（:8787），Nginx 已配置 `/api` 反代。**生产环境务必改用 STS 临时密钥**（§7.4），不要把永久密钥下发到公网浏览器。
 
 ### 3.2 后续更新
 
@@ -118,13 +125,11 @@ H5/
     ├── App.vue               # 外壳：头部 + 安全上下文告警 + 路由出口
     ├── router.js             # 极简 hash 路由（无 vue-router 依赖）
     ├── styles/main.css       # 移动端样式（CSS 变量，无 UI 框架）
-    ├── data/paper.js         # 体验卷数据（题面、听力文本、要点、建议时长）
-    ├── data/readAloudPaper.js # 模仿朗读短文素材（段落模式 ≤120 词）
+├── data/paper.js         # 多年级试卷数据（GRADES + papers + getPaper，题面/听力文本/参考范文/要点/建议时长）
     ├── services/
 │   ├── audioPlayer.js    # 听力播放：有 audioUrl 用音频，无则用浏览器 TTS
-│   ├── recorder.js       # 录音：getUserMedia + MediaRecorder + 音量条 + 麦克风释放
 │   ├── player.js         # 录音回放：原生播放 + duration 修复 + WebAudio 降级
-    │   ├── evaluator.js      # 评分：选择题判分 + 口语模拟评分 + 报告汇总 + 建议
+│   ├── evaluator.js      # 评分：选择题判分 + 口语题消费智聆真实结果 + 报告汇总 + 建议
     │   ├── store.js          # 结果存储（localStorage）与音频 URL 内存缓存
     │   └── soeSdk.js         # 智聆 Web SDK 封装：加载 SDK、取密钥、发起评测、解析结果
     └── pages/
@@ -134,14 +139,12 @@ H5/
 
 ---
 
-## 五、评分是「模拟」的，替换点在哪
+## 五、评分已切到智聆真评（新版 Web SDK）
 
-当前 `src/services/evaluator.js` 里的 `evaluateSpeech()` 是**本地模拟评分**：不上传音频、不调用外部接口，只用「录音时长 / 建议时长」的比值生成准确度、流利度、完整度、要点覆盖四维分数，目的是先把「采集 → 评分 → 报告」整条链路跑通。
+全部口语题（模仿朗读 / 情景交际 / 信息转述）均通过 `src/services/soeSdk.js` 调用腾讯云智聆口语评测（新版）Web SDK，由 SDK 内置录音并直连 `wss://soe.cloud.tencent.com` 完成评测。初始化参数与 2026-09-18 调试记录一致（`eval_mode=2` 段落 / `server_engine_type=16k_en` / `score_coeff=2.5` / `sentence_info_enabled=1` / `text_mode=0`），七/八/九年级体验卷共用同一套 `startReadAloud()`。`src/services/evaluator.js` 现在只做报告汇总，**不再做任何本地模拟评分**（mock 的 `evaluateSpeech` 与未启用的服务端路径 `evaluateByServer` 均已删除）。
 
-接入**腾讯云智聆口语评测（新版）**时只需两步，报告层代码不用改：
-
-1. 后端新增 `/api/eval`：服务端签发 WSS 签名（`Base64(HmacSHA1(签名原文, SecretKey))`），转发音频到 `wss://soe.cloud.tencent.com/soe/api/<appid>`，**SecretKey 绝不下发到前端**；
-2. 把 `evaluateSpeech()` 换成已写好的 `evaluateByServer()`（读取 `VITE_API_BASE`），返回结构保持 `{ accuracy, fluency, completion, content, words: [] }` 即可。
+- 智聆仅返回发音层三维分（准确度 / 流利度 / 完整度），**不评语义与内容**；情景交际 / 信息转述的内容分需业务侧另建 ASR + LLM 量规，当前「要点覆盖」维度显示为 0，属真实情况，不作假。
+- 密钥由自建后端 `/api/soe/credential` 下发（详见 §七与 `server/index.mjs`）；浏览器端不持有 SecretKey 的明文构造逻辑，但调试模式会下发永久密钥，生产须改 STS（见 §7.4）。
 
 > 智聆新版硬约束备忘：音频 16kHz/16bit/单声道，pcm/wav/mp3(≥32kbps)/speex；单次最长 300s；默认单账号并发 50 路（超出 30 元/路/月）；发送节奏 1:1 实时率。
 
@@ -152,14 +155,16 @@ H5/
 - 听力音频用浏览器 TTS 合成，音色与真实考试录音不同；把真人录音 mp3 放进 `public/audio/` 并在 `paper.js` 填 `audioUrl` 即可切换。
 - 录音保留在当前会话内存（blob + blob URL），刷新页面后回放失效；结果结构化数据存 localStorage。
 - 试听不用原生 `<audio controls>`：MediaRecorder 产出的容器缺 duration（原生拿到的 `duration` 是 `Infinity`），会导致进度条失效、iOS Safari 点了不响。`services/player.js` 先修 duration，修不好就降级到 WebAudio `decodeAudioData` 播放（UI 会标注「兼容模式」）。
-- 模拟评分不具信效度，仅供链路演示与交互验证，禁止对外当作真实成绩使用。
+- 智聆评测结果仅供练习反馈，不代表任何考试的实际得分或预测；对外口径须遵守合规红线（结果页已内置免责声明，详见 §3.3）。
 - 未实现：登录、支付、后台管理、题库管理、班级/作业、音频上传服务端留存。
 
 ---
 
-## 七、模仿朗读 · 智聆真评闭环（`#/readaloud`）
+## 七、全题型 · 智聆真评闭环
 
-用**腾讯云官方 Web SDK** 跑通单题型真评：录音 → 智聆 → 三维分 → 词级明细。
+测评页（`#/`）的**全部口语题型**统一走腾讯云官方 Web SDK：用户选择年级 → 加载该年级完整试卷 → 每道口语题录音 → 智聆返回发音层三维分 + 词级明细 → 结果页汇总。现有的「模仿朗读」独立 demo 页已移除，所有口语评测收敛到 `Assessment.vue` 一套 `startReadAloud()`。
+
+> 初始化参数（`soeSdk.js`）：`eval_mode=2` 段落模式（≤120 词）、`server_engine_type=16k_en`、`score_coeff=2.5`、`sentence_info_enabled=1`、`text_mode=0`，与 2026-09-18 调试记录一致。情景交际 / 信息转述在 `paper.js` 中额外提供「参考范文」作为智聆的 `ref_text`（评发音用），内容/语义分仍需业务侧另建 ASR + LLM 量规。
 
 ### 7.1 技术选型（已核实）
 
@@ -188,10 +193,10 @@ cp server/.env.example server/.env   # 填 SOE_APPID / SOE_SECRET_ID / SOE_SECRE
 
 # 2) 起服务（两个终端）
 npm run server     # 密钥服务 127.0.0.1:8787
-npm run dev        # H5  http://localhost:5173/#/readaloud
+npm run dev        # H5  http://localhost:5173/#/
 ```
 
-未配置密钥时页面会明确提示，并可点「用模拟数据预览报告」验证 UI。
+未配置密钥时测评页会明确提示「去配置密钥服务」，不提供任何模拟数据回退（已彻底弃用本地体验功能）。
 
 **AppId 在哪看**：登录腾讯云控制台 → 右上角**头像** → **账号信息** → **基本信息** → 就是「APPID」那一栏（与账号 ID/UIN 唯一对应）。直达：https://console.cloud.tencent.com/developer
 
@@ -223,7 +228,7 @@ npm run dev        # H5  http://localhost:5173/#/readaloud
 
 **真实调用已跑通（2026-09-18，AppId 1315596766）**：WSS 握手成功、服务端返回 `code:0` 且 `final:1`，完整链路闭环。过程中修掉两个真实问题：
 
-1. **页面永远卡在「评测中」**：`stop()` 只 `await c.done` 却**没调 `c.stop()`**，SDK 不发 `{"type":"end"}`，服务端等不到结束信号就永不返回最终结果。已修（`ReadAloud.vue` 的 `stop()` 先调 `c.stop()` 再 await）。排查手法：Playwright 监听 `page.on('websocket')` 的 framesent/framereceived，能直接看到"音频帧一直发、服务端只回了 initial 那条"。
+1. **页面永远卡在「评测中」**：`stop()` 只 `await c.done` 却**没调 `c.stop()`**，SDK 不发 `{"type":"end"}`，服务端等不到结束信号就永不返回最终结果。已修（`Assessment.vue` 的 `stopRecord()` 先调 `c.stop()` 再 await）。排查手法：Playwright 监听 `page.on('websocket')` 的 framesent/framereceived，能直接看到"音频帧一直发、服务端只回了 initial 那条"。
 2. **无效语音会显示莫名的 0 分**：无有效人声时服务端回 `SuggestedScore=0 / PronAccuracy=0 / PronCompletion=0 / PronFluency=-1 / Words=[]`。`normalizeResult` 已加 `noSpeech` 判定，页面改提示"未检测到有效语音，本次不计分"。
 
 **一个被推翻的假设**：`result` 字段**不是** Go 结构体风格字符串，新版 SDK 回传的已是**解析好的 JSON 对象**（`soeSdk.js` 保留字符串分支仅作兜底）。

@@ -20,5 +20,8 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
     "vite": "^5.4.11"
+  },
+  "optionalDependencies": {
+    "tencentcloud-sdk-nodejs-sts": "^4.1.100"
   }
 }

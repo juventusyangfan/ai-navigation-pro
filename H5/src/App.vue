@@ -3,7 +3,6 @@
     <header class="app-header">
       <span class="app-title">英语听说测评</span>
       <span class="app-tag">体验版</span>
-      <button class="app-nav" @click="go('#/readaloud')">智聆真评</button>
     </header>
 
     <div v-if="!isSecure" class="banner banner-warn">
@@ -21,8 +20,4 @@ import { useRoute } from './router.js'
 
 const { view } = useRoute()
 const isSecure = window.isSecureContext === true
-
-function go(hash) {
-  window.location.hash = hash.replace(/^#/, '')
-}
 </script>

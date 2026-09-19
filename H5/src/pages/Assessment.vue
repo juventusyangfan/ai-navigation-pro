@@ -1,15 +1,35 @@
 <template>
   <div class="page">
-    <!-- 未开始：首页说明 -->
+    <!-- 未开始：年级选择 + 首页说明 -->
     <section v-if="!started" class="card">
-      <h2 class="card-title">{{ paper.title }}</h2>
-      <p class="muted">共 {{ paper.sections.length }} 个题型，满分 {{ paper.totalScore }} 分，约需 5 分钟。</p>
-      <ul class="tips">
-        <li>请在安静环境下完成，佩戴耳机可减少回声。</li>
-        <li>首次点击录音会请求麦克风权限，请选择「允许」。</li>
-        <li>本测评为练习反馈，不代表任何考试得分。</li>
-      </ul>
-      <button class="btn btn-primary btn-block" @click="start">开始测评</button>
+      <h2 class="card-title">英语听说能力测评</h2>
+      <p class="muted">请先选择测评年级，加载对应完整试卷（全程由腾讯云智聆口语评测提供发音评测）。</p>
+
+      <div class="grades">
+        <button
+          v-for="g in GRADES"
+          :key="g.id"
+          class="grade-card"
+          :class="{ active: selectedGrade === g.id }"
+          @click="selectGrade(g.id)"
+        >
+          <span class="grade-label">{{ g.label }}</span>
+          <span class="grade-desc">{{ g.desc }}</span>
+        </button>
+      </div>
+
+      <template v-if="selectedGrade">
+        <p class="muted small">
+          {{ paper.title }} · 共 {{ paper.sections.length }} 个题型 · 满分 {{ paper.totalScore }} 分
+        </p>
+        <ul class="tips">
+          <li>请在安静环境下完成，佩戴耳机可减少回声。</li>
+          <li>首次点击录音会请求麦克风权限，请选择「允许」。</li>
+          <li>本测评为练习反馈，不代表任何考试得分。</li>
+        </ul>
+        <button class="btn btn-primary btn-block" @click="start">开始测评（{{ gradeLabel }}）</button>
+      </template>
+      <p v-else class="muted small">尚未选择年级。</p>
     </section>
 
     <!-- 答题中 -->
@@ -43,7 +63,7 @@
           </div>
         </template>
 
-        <!-- 口语题：模仿朗读 / 情景交际 / 信息转述 -->
+        <!-- 口语题：模仿朗读 / 情景交际 / 信息转述（统一走智聆 SDK） -->
         <template v-else>
           <div v-if="current.passage" class="passage">{{ current.passage }}</div>
 
@@ -62,17 +82,21 @@
             <span v-for="(k, i) in current.keyPoints" :key="i" class="chip">{{ k }}</span>
           </div>
 
+          <!-- 情景交际 / 信息转述：展示参考范文，作为智聆评发音的 ref_text -->
+          <div v-if="current.refText && current.type !== 'read_aloud'" class="passage ref">
+            <span class="keypoints-title">{{ current.type === 'retell' ? '参考转述范文' : '参考范文' }}</span>
+            <div class="ref-text">{{ current.refText }}</div>
+          </div>
+
           <div class="record-box">
             <div v-if="prepareLeft > 0" class="prepare">
               准备时间 {{ prepareLeft }}s
               <button class="link" @click="skipPrepare">跳过</button>
             </div>
 
-            <div class="meter">
-              <div class="meter-fill" :style="{ width: level + '%' }"></div>
-            </div>
             <p class="record-time">
-              {{ recording ? '录音中 ' : '时长 ' }}{{ fmtMs(recordingMs) }}
+              <template v-if="evaluating">评测中…</template>
+              <template v-else>{{ recording ? '录音中 ' : '时长 ' }}{{ fmtMs(recordingMs) }}</template>
               <span v-if="!recording && answers[current.id]?.rec" class="muted">/ 建议 {{ current.suggestSec }}s</span>
             </p>
 
@@ -111,37 +135,49 @@
       </div>
 
       <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="credError" class="muted small">{{ credError }}</p>
     </template>
   </div>
 </template>
 
 <script setup>
 import { computed, onUnmounted, reactive, ref, toRaw } from 'vue'
-import { paper } from '../data/paper.js'
+import { GRADES, getPaper } from '../data/paper.js'
 import { navigate } from '../router.js'
 import { play, stopAll, ttsSupported } from '../services/audioPlayer.js'
-import { Recorder, isSupported, requestMic, releaseMic } from '../services/recorder.js'
+import { startReadAloud, pcmToWav } from '../services/soeSdk.js'
 import { playRecorded, stopPlayback } from '../services/player.js'
 import { buildResult } from '../services/evaluator.js'
 import { saveResult, setAudio } from '../services/store.js'
 
 const started = ref(false)
+const selectedGrade = ref('')
+const paper = ref(getPaper('grade7'))
 const stepIndex = ref(0)
 const answers = reactive({})
 const error = ref('')
+const credError = ref('')
 const playing = ref(false)
 const recording = ref(false)
+const evaluating = ref(false)
 const recordingMs = ref(0)
-const level = ref(0)
 const prepareLeft = ref(0)
 
 const replayLeft = reactive({})
 const playingId = ref('')
 const playInfo = ref(null)
 const playError = ref('')
+
+const gradeLabel = computed(() => (GRADES.find((g) => g.id === selectedGrade.value) || {}).label || '')
+
+function selectGrade(id) {
+  selectedGrade.value = id
+  paper.value = getPaper(id)
+}
+
 const steps = computed(() => {
   const list = []
-  paper.sections.forEach((s) => {
+  paper.value.sections.forEach((s) => {
     s.items.forEach((it) => {
       list.push({
         ...it,
@@ -163,11 +199,24 @@ const answered = computed(() => {
   return current.value.type === 'choice' ? typeof a.choiceIndex === 'number' : !!a.rec
 })
 
-let stream = null
-let recorder = null
+let ctrl = null
 let timer = null
 let prepareTimer = null
 let limitTimer = null
+
+// SDK 返回的 PCM 转 WAV，供结果页 <audio>/WebAudio 回放
+async function pcmToWavRec(pcm) {
+  let buf = null
+  if (pcm instanceof ArrayBuffer) buf = pcm
+  else if (pcm && pcm.buffer instanceof ArrayBuffer) {
+    buf = pcm.buffer.slice(pcm.byteOffset || 0, (pcm.byteOffset || 0) + pcm.byteLength)
+  }
+  if (!buf) return null
+  const blob = pcmToWav(buf)
+  const url = URL.createObjectURL(blob)
+  const durationMs = Math.round((buf.byteLength / (16000 * 2)) * 1000)
+  return { blob, url, durationMs }
+}
 
 function fmtMs(ms) {
   const s = Math.floor(ms / 1000)
@@ -175,6 +224,10 @@ function fmtMs(ms) {
 }
 
 function start() {
+  if (!selectedGrade.value) {
+    error.value = '请先选择测评年级。'
+    return
+  }
   if (!ttsSupported) {
     error.value = '当前浏览器不支持语音合成，听力题将只显示文本（不影响作答）。'
   }
@@ -223,24 +276,29 @@ function choose(i) {
 
 async function startRecord() {
   error.value = ''
-  if (!isSupported()) {
-    error.value = '当前浏览器不支持录音，请更换浏览器或在系统浏览器中打开（微信内请点右上角「用浏览器打开」）。'
+  credError.value = ''
+  const item = current.value
+  // 全口语题型统一走智聆 SDK 内置录音 + 评测（与 2026-09-18 调试记录参数一致：eval_mode=2 段落 / 16k_en）
+  // ref_text 优先级：参考范文(refText) > 朗读/题干(passage) > 听力源文(audioText)
+  const refText = item.refText || item.passage || item.audioText || ''
+  try {
+    ctrl = await startReadAloud({ refText, evalMode: 2, scoreCoeff: 2.5 })
+  } catch (e) {
+    const msg = e.message || String(e)
+    // 密钥/服务类问题单独提示，引导去配置密钥服务，而不是当评测失败
+    if (e.isCredential) {
+      credError.value = msg + '（请确认 server 已配置真实密钥并运行 npm run server）'
+    } else {
+      error.value = msg
+    }
+    ctrl = null
     return
   }
-  try {
-    if (!stream) {
-      stream = await requestMic()
-      recorder = new Recorder(stream, (v) => (level.value = v))
-    }
-    recordingMs.value = 0
-    recorder.start()
-    recording.value = true
-    timer = setInterval(() => (recordingMs.value += 100), 100)
-    const limit = (current.value.suggestSec || 30) * 2
-    limitTimer = setTimeout(() => stopRecord(), limit * 1000)
-  } catch (e) {
-    error.value = e.message || '无法访问麦克风，请检查权限设置。'
-  }
+  recording.value = true
+  recordingMs.value = 0
+  timer = setInterval(() => (recordingMs.value += 100), 100)
+  const limit = (item.suggestSec || 30) * 2
+  limitTimer = setTimeout(() => stopRecord(), limit * 1000)
 }
 
 async function togglePlay(itemId) {
@@ -270,20 +328,32 @@ function resetPlayState() {
 async function stopRecord() {
   clearInterval(timer)
   clearTimeout(limitTimer)
-  if (!recorder) return
-  const rec = await recorder.stop()
+  const c = ctrl
+  if (!c) {
+    recording.value = false
+    return
+  }
+  ctrl = null
   recording.value = false
-  // 录音结束立刻释放麦克风：否则部分安卓/微信 WebView 会把播放输出切到听筒
-  releaseMic(stream)
-  stream = null
-  recorder = null
-  if (rec) {
-    if (rec.durationMs < 1000) {
-      error.value = '录音过短，未采集到有效语音，请重新录音。'
+  evaluating.value = true
+  try {
+    const soe = await c.done
+    if (soe && soe.noSpeech) {
+      // 未检测到有效人声：不计分，提示重录
+      error.value = '未检测到有效语音，本次不计分。请确认麦克风已授权、朗读声音稍大一些后重录。'
+      evaluating.value = false
       return
     }
-    answers[current.value.id] = { rec }
-    setAudio(current.value.id, rec)
+    const pcm = c.getAudio()
+    const rec = pcm ? await pcmToWavRec(pcm) : null
+    answers[current.value.id] = { soe, rec }
+    if (rec) setAudio(current.value.id, rec)
+    evaluating.value = false
+  } catch (e) {
+    const msg = e.message || String(e)
+    if (e.isCredential) credError.value = msg
+    else error.value = msg
+    evaluating.value = false
   }
 }
 
@@ -310,7 +380,7 @@ function prev() {
 }
 
 function submit() {
-  const result = buildResult(paper, answers)
+  const result = buildResult(paper.value, answers)
   saveResult(result)
   navigate('/result')
 }
@@ -325,7 +395,63 @@ onUnmounted(() => {
   clearTimers()
   stopAll()
   stopPlayback()
-  releaseMic(stream)
-  stream = null
+  if (ctrl) {
+    try {
+      ctrl.stop()
+    } catch (e) {
+      /* ignore */
+    }
+  }
 })
 </script>
+
+<style scoped>
+.grades {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0;
+}
+.grade-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.grade-card:hover {
+  border-color: var(--primary);
+}
+.grade-card.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+.grade-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+.grade-desc {
+  font-size: 12px;
+  opacity: 0.85;
+  line-height: 1.4;
+}
+.passage.ref {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #f5f8ff;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+.ref-text {
+  margin-top: 6px;
+  line-height: 1.6;
+  color: var(--text);
+}
+</style>
