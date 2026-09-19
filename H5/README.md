@@ -144,7 +144,7 @@ H5/
 全部口语题（模仿朗读 / 情景交际 / 信息转述）均通过 `src/services/soeSdk.js` 调用腾讯云智聆口语评测（新版）Web SDK，由 SDK 内置录音并直连 `wss://soe.cloud.tencent.com` 完成评测。初始化参数与 2026-09-18 调试记录一致（`eval_mode=2` 段落 / `server_engine_type=16k_en` / `score_coeff=2.5` / `sentence_info_enabled=1` / `text_mode=0`），七/八/九年级体验卷共用同一套 `startReadAloud()`。`src/services/evaluator.js` 现在只做报告汇总，**不再做任何本地模拟评分**（mock 的 `evaluateSpeech` 与未启用的服务端路径 `evaluateByServer` 均已删除）。
 
 - 智聆仅返回发音层三维分（准确度 / 流利度 / 完整度），**不评语义与内容**；情景交际 / 信息转述的内容分需业务侧另建 ASR + LLM 量规，当前「要点覆盖」维度显示为 0，属真实情况，不作假。
-- 密钥由自建后端 `/api/soe/credential` 下发（详见 §七与 `server/index.mjs`）；浏览器端不持有 SecretKey 的明文构造逻辑，但调试模式会下发永久密钥，生产须改 STS（见 §7.4）。
+- 密钥由自建后端 `/api/soe/credential` 下发（详见 §七与 `server/index.mjs`）；浏览器端不持有 SecretKey 的明文构造逻辑，调试模式（`SOE_ALLOW_STATIC=1`）会下发永久密钥，生产默认走 STS 临时密钥（见 §7.4）。
 
 > 智聆新版硬约束备忘：音频 16kHz/16bit/单声道，pcm/wav/mp3(≥32kbps)/speex；单次最长 300s；默认单账号并发 50 路（超出 30 元/路/月）；发送节奏 1:1 实时率。
 
@@ -216,11 +216,11 @@ npm run dev        # H5  http://localhost:5173/#/
 
 | 配置 | 行为 |
 |---|---|
-| 默认（`SOE_ALLOW_STATIC=0`） | `/api/soe/credential` 返回 501，**拒绝下发永久密钥** |
-| `SOE_ALLOW_STATIC=1` | 仅本地调试，把永久密钥发给浏览器（启动时会打警告） |
-| `SOE_STS_ROLE_ARN=...` | 生产路径：走 CAM `GetFederationToken` 换临时密钥（需另装 `tencentcloud-sdk-nodejs-sts`，`server/index.mjs` 里已留实现位） |
+| 默认（不设置 `SOE_ALLOW_STATIC`） | **生产模式**：`/api/soe/credential` 走 STS，返回临时三件套（TmpSecretId / TmpSecretKey / Token），永久密钥留服务端，浏览器直连腾讯云时携带 `&token=` |
+| `SOE_ALLOW_STATIC=1` | 仅本地调试，把永久密钥下发给浏览器（启动时打警告）；**禁止用于生产环境** |
+| `SOE_STS_ROLE_ARN=任意值` | 强制走 STS（即便 `SOE_ALLOW_STATIC` 误设为 1），作为兜底开关 |
 
-正式上线**必须**用临时密钥；永久密钥下发到浏览器等于把账号交出去。
+正式上线**默认即走 STS 临时密钥**（本地实测已返回 200 + 临时三件套）；若误开 `SOE_ALLOW_STATIC=1`，永久密钥下发到浏览器等于把账号交出去。
 
 ### 7.5 已验证 / 未验证
 
@@ -230,6 +230,7 @@ npm run dev        # H5  http://localhost:5173/#/
 
 1. **页面永远卡在「评测中」**：`stop()` 只 `await c.done` 却**没调 `c.stop()`**，SDK 不发 `{"type":"end"}`，服务端等不到结束信号就永不返回最终结果。已修（`Assessment.vue` 的 `stopRecord()` 先调 `c.stop()` 再 await）。排查手法：Playwright 监听 `page.on('websocket')` 的 framesent/framereceived，能直接看到"音频帧一直发、服务端只回了 initial 那条"。
 2. **无效语音会显示莫名的 0 分**：无有效人声时服务端回 `SuggestedScore=0 / PronAccuracy=0 / PronCompletion=0 / PronFluency=-1 / Words=[]`。`normalizeResult` 已加 `noSpeech` 判定，页面改提示"未检测到有效语音，本次不计分"。
+3. **录完没有「试听录音」按钮**：SDK 的 `OnRecorderStop` 回传的**不是 `ArrayBuffer`**，而是 WebRecorder 用 `allAudioData.push(...new Int8Array(chunk))` 累积出来的**普通数组**（实测 2.4s 音频 ≈ 77486 个字节元素）。旧代码只认 `ArrayBuffer`/TypedArray，于是 `pcmToWavRec()` 直接返回 `null` → `answers[id].rec` 为空 → 模板 `v-if="answers[current.id]?.rec"` 不放行，试听入口整个消失（早期用 MediaRecorder 的版本不会踩到，因为拿到的是真 Blob）。已加 `soeSdk.toArrayBuffer()` 统一兼容三种形态，页面与结果页共享该归一化器。定位手法：在 `OnRecorderStop` 里把 `typeof / Array.isArray / constructor.name / length` 挂到 `window` 上，Playwright 用 `page.evaluate` 读回来即可确定形态。
 
 **一个被推翻的假设**：`result` 字段**不是** Go 结构体风格字符串，新版 SDK 回传的已是**解析好的 JSON 对象**（`soeSdk.js` 保留字符串分支仅作兜底）。
 

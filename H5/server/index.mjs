@@ -18,7 +18,11 @@ const ALLOW_STATIC = process.env.SOE_ALLOW_STATIC === '1'
 const APPID = process.env.SOE_APPID || ''
 const SECRET_ID = process.env.SOE_SECRET_ID || ''
 const SECRET_KEY = process.env.SOE_SECRET_KEY || ''
+// 兼容开关：显式设置 SOE_STS_ROLE_ARN 会强制走 STS（即便 SOE_ALLOW_STATIC 误开）。
+// 实际 GetFederationToken 不需要 RoleArn —— 主密钥直接换临时凭证即可；此变量仅作「强制 STS」布尔开关。
 const STS_ROLE_ARN = process.env.SOE_STS_ROLE_ARN || ''
+// 生产默认 STS：未开本地调试、或显式强制 STS 时均走临时密钥；否则下发永久密钥（仅限调试）
+const STS_ENABLED = !ALLOW_STATIC || !!STS_ROLE_ARN
 
 const configured = !!(APPID && SECRET_ID && SECRET_KEY)
 
@@ -50,25 +54,53 @@ function send(res, code, body) {
 }
 
 // —— STS 临时密钥（生产路径）：用主密钥去换一张短期凭证，前端只拿到临时三件套 ——
+// 官方文档：https://cloud.tencent.com/document/product/1774/107352
+// 接口：sts.tencentcloudapi.com  GetFederationToken（TC3-HMAC-SHA256 签名）
+// 权限策略采用最小原则：仅放开口语评测（新版）流式评测接口 soe:SpeakingAssessmentStream
+let stsClientPromise = null
+async function getStsClient() {
+  if (!stsClientPromise) {
+    stsClientPromise = (async () => {
+      const tc = await import('tencentcloud-sdk-nodejs-sts')
+      const sts = tc.sts || (tc.default && tc.default.sts)
+      if (!sts || !sts.v20180813 || !sts.v20180813.Client) {
+        throw new Error('STS SDK 结构异常：未找到 sts.v20180813.Client，请确认已安装 tencentcloud-sdk-nodejs-sts')
+      }
+      return new sts.v20180813.Client({
+        credential: { secretId: SECRET_ID, secretKey: SECRET_KEY },
+        region: 'ap-guangzhou',
+        profile: { httpProfile: { endpoint: 'sts.tencentcloudapi.com' } }
+      })
+    })()
+  }
+  return stsClientPromise
+}
+
 async function fetchStsCredential() {
-  // 官方接口：sts.tencentcloudapi.com  GetFederationToken（TC3-HMAC-SHA256 签名）
-  // 这里保留实现位，避免 MVP 阶段引入未验证的签名代码。启用条件：配置 SOE_STS_ROLE_ARN
-  // 且安装官方 SDK：npm i tencentcloud-sdk-nodejs-sts
-  throw new Error(
-    'STS 未启用：请安装 tencentcloud-sdk-nodejs-sts 并在此处实现 GetFederationToken（生产环境必须走临时密钥）'
-  )
-  // 参考实现（安装 SDK 后取消注释并删除上面的 throw）：
-  // import stsPkg from 'tencentcloud-sdk-nodejs-sts'; const sts = stsPkg.sts
-  // const client = new sts.v20180813.Client({
-  //   credential: { secretId: SECRET_ID, secretKey: SECRET_KEY },
-  //   region: 'ap-guangzhou', profile: { httpProfile: { endpoint: 'sts.tencentcloudapi.com' } }
-  // })
-  // const r = await client.GetFederationToken({
-  //   Name: 'h5-soe', Policy: JSON.stringify({ version: '2.0', statement: [
-  //     { effect: 'allow', action: ['soe:*'], resource: ['*'] } ] })
-  // })
-  // return { secretid: r.Credentials.TmpSecretId, secretkey: r.Credentials.TmpSecretKey,
-  //          token: r.Credentials.Token, expired: r.ExpiredTime }
+  if (!configured) {
+    throw new Error('服务端主密钥未配置（SOE_SECRET_ID / SOE_SECRET_KEY 缺失），无法换取 STS 临时密钥')
+  }
+  const client = await getStsClient()
+  // 最小权限策略：仅允许口语评测（新版）流式评测接口
+  const policy = {
+    version: '2.0',
+    statement: [{ effect: 'allow', action: ['soe:SpeakingAssessmentStream'], resource: '*' }]
+  }
+  const r = await client.GetFederationToken({
+    Name: 'SOE',
+    Policy: JSON.stringify(policy),
+    DurationSeconds: 1800
+  })
+  const c = r && r.Credentials
+  if (!c || !c.TmpSecretId) {
+    throw new Error('STS 返回异常：响应中缺少 Credentials.TmpSecretId')
+  }
+  return {
+    secretid: c.TmpSecretId,
+    secretkey: c.TmpSecretKey,
+    token: c.Token,
+    expired: r.ExpiredTime
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -87,7 +119,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, {
       ok: true,
       configured,
-      mode: STS_ROLE_ARN ? 'sts' : ALLOW_STATIC ? 'static' : 'refuse'
+      mode: STS_ENABLED ? 'sts' : ALLOW_STATIC ? 'static' : 'refuse'
     })
   }
 
@@ -99,41 +131,33 @@ const server = http.createServer(async (req, res) => {
       })
     }
 
-    // 生产路径：STS 临时密钥
-    if (STS_ROLE_ARN) {
-      try {
-        const c = await fetchStsCredential()
-        return send(res, 200, { appid: APPID, mode: 'sts', ...c })
-      } catch (e) {
-        return send(res, 501, { error: 'STS_FAILED', message: e.message })
-      }
-    }
-
-    // 调试路径：明文永久密钥，必须显式开启
-    if (!ALLOW_STATIC) {
-      return send(res, 501, {
-        error: 'STATIC_CREDENTIAL_DISABLED',
-        message:
-          '当前拒绝下发永久密钥。仅本地调试可在 server/.env 设置 SOE_ALLOW_STATIC=1；正式环境必须改用 STS 临时密钥（SOE_STS_ROLE_ARN）。'
+    // 本地调试：明文永久密钥，必须显式开启 SOE_ALLOW_STATIC=1（且未强制 STS）
+    if (ALLOW_STATIC && !STS_ROLE_ARN) {
+      return send(res, 200, {
+        appid: APPID,
+        secretid: SECRET_ID,
+        secretkey: SECRET_KEY,
+        token: '',
+        expired: Math.floor(Date.now() / 1000) + 3600,
+        mode: 'static',
+        warning: 'DEV ONLY：永久密钥已下发到浏览器，禁止用于生产环境。'
       })
     }
 
-    return send(res, 200, {
-      appid: APPID,
-      secretid: SECRET_ID,
-      secretkey: SECRET_KEY,
-      token: '',
-      expired: Math.floor(Date.now() / 1000) + 3600,
-      mode: 'static',
-      warning: 'DEV ONLY：永久密钥已下发到浏览器，禁止用于生产环境。'
-    })
+    // 生产路径：STS 临时密钥（永久密钥留服务端，浏览器只拿到临时三件套）
+    try {
+      const c = await fetchStsCredential()
+      return send(res, 200, { appid: APPID, mode: 'sts', ...c })
+    } catch (e) {
+      return send(res, 501, { error: 'STS_FAILED', message: e.message })
+    }
   }
 
   send(res, 404, { error: 'NOT_FOUND' })
 })
 
 server.listen(PORT, () => {
-  const mode = STS_ROLE_ARN ? 'sts' : ALLOW_STATIC ? 'static(DEV)' : 'refuse(默认)'
+  const mode = STS_ENABLED ? 'sts(生产)' : 'static(DEV)'
   console.log(`[soe-cred] http://127.0.0.1:${PORT}  configured=${configured}  mode=${mode}`)
   if (!configured) console.log('[soe-cred] 未配置密钥，请先填写 server/.env')
   if (ALLOW_STATIC && !STS_ROLE_ARN) {
