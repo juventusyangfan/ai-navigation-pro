@@ -1,0 +1,13 @@
+{
+  "name": "h5-soe-credential-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "H5 听说测评最小后端：仅负责下发智聆口语评测密钥（禁止把 SecretKey 写进前端）",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "start": "node index.mjs"
+  }
+}
