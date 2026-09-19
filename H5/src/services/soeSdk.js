@@ -205,23 +205,52 @@ export async function startReadAloud({ refText, evalMode = 2, scoreCoeff = 2.5, 
 
   const sdk = new Sdk(params, false)
   let audioData = null
+  let outerReject = null
+  let stopFinalTimer = null
 
   const done = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('评测超时：120 秒内未收到最终结果')), 120000)
-    const finish = (v) => {
+    outerReject = reject
+    let settled = false
+    // 统一出口：只结算一次，并清理所有定时器（连接守卫 / 总超时 / 停止后收尾守卫）
+    const clearAll = () => {
+      clearTimeout(connectTimer)
       clearTimeout(timer)
+      if (stopFinalTimer) clearTimeout(stopFinalTimer)
+    }
+    const guard = (msg) => {
+      if (settled) return
+      settled = true
+      clearAll()
+      reject(new Error(msg))
+    }
+    // 连接建立守卫：15s 内未进入评测（WebSocket 未连上），立即明确报网络故障，
+    // 避免体感「卡死」在「评测中」干等 120s。线上多因网络/防火墙拦截 wss 升级导致。
+    const connectTimer = setTimeout(
+      () =>
+        guard(
+          '无法连接腾讯云评测服务：浏览器到 wss://soe.cloud.tencent.com 的 WebSocket 未建立。' +
+            '多为网络/防火墙拦截了 WebSocket 升级（学校、企业网常见）；请确认放行该域名，' +
+            '且 AppId、密钥匹配、服务已开通。'
+        ),
+      15000
+    )
+    // 总超时兜底：已连上但 120s 仍未收到最终结果（极少发生）
+    const timer = setTimeout(() => guard('评测超时：120 秒内未收到最终结果'), 120000)
+    const finish = (v) => {
+      if (settled) return
+      settled = true
+      clearAll()
       resolve(v)
     }
-    const fail = (e) => {
-      clearTimeout(timer)
-      reject(toError(e))
-    }
-    sdk.OnEvaluationStart = () => {}
+    const fail = (e) => guard(toError(e).message)
+    sdk.OnEvaluationStart = () => clearTimeout(connectTimer) // 连接已建立，取消连接守卫
     sdk.OnEvaluationResultChange = (r) => {
       if (onChange) onChange(normalizeResult(r))
     }
     sdk.OnEvaluationComplete = (r) => finish(normalizeResult(r))
     sdk.OnError = fail
+    // 注意：SDK 回传的是「普通数组」（WebRecorder 用 allAudioData.push(...) 累积的字节序列），
+    // 不是 ArrayBuffer —— 消费方必须经 toArrayBuffer() 归一化，否则录音会被丢弃。
     sdk.OnRecorderStop = (d) => {
       audioData = d
     }
@@ -238,6 +267,12 @@ export async function startReadAloud({ refText, evalMode = 2, scoreCoeff = 2.5, 
     stop: () => {
       try {
         sdk.stop()
+        // 停止后收尾守卫：已发送 {type:"end"}，若 15s 内仍未收到 final:1（OnEvaluationComplete），
+        // 则强制结算并提示重录，避免体感卡死在「评测中」干等 120s。
+        // 留足 15s：弱网 / 评测引擎排队时收尾可能数秒，避免正常评测被误判为失败。
+        stopFinalTimer = setTimeout(() => {
+          if (outerReject) outerReject(new Error('评测结束，但服务端未回传最终结果，请重录。'))
+        }, 15000)
       } catch (e) {
         /* ignore */
       }
@@ -246,7 +281,30 @@ export async function startReadAloud({ refText, evalMode = 2, scoreCoeff = 2.5, 
   }
 }
 
-// SDK 回传的音频可能是 PCM(ArrayBuffer)，包一层 WAV 头才能用 <audio> 播放
+/**
+ * 把 SDK 回传的录音数据归一化成 ArrayBuffer。
+ *
+ * 为什么必须归一化：SDK 的 WebRecorder 内部是用
+ *   this.allAudioData.push(...new Int8Array(chunk))
+ * 累积音频的，stop() 时把**普通数组**（元素为有符号字节值）经 OnRecorderStop 回传，
+ * 它既不是 ArrayBuffer 也不是 TypedArray —— 只认 ArrayBuffer 会把录音整个丢掉，
+ * 表现为「录完没有试听按钮」。这里统一兼容三种形态。
+ */
+export function toArrayBuffer(data) {
+  if (!data) return null
+  if (data instanceof ArrayBuffer) return data.byteLength ? data : null
+  if (ArrayBuffer.isView(data)) {
+    if (!data.byteLength) return null
+    return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+  }
+  // 普通数组：SDK 累积出来的字节序列（有符号），按 Uint8 回写即还原原始字节
+  if (typeof data.length === 'number') {
+    return data.length ? new Uint8Array(data).buffer : null
+  }
+  return null
+}
+
+// SDK 回传的音频是 16k 单声道 PCM，包一层 WAV 头才能用 <audio> 播放
 export async function toWavUrl(data, sampleRate = 16000) {
   if (!data) return null
   if (typeof data === 'string') return data
@@ -254,18 +312,14 @@ export async function toWavUrl(data, sampleRate = 16000) {
     if (data.type && data.type !== 'application/octet-stream') return URL.createObjectURL(data)
     return data.arrayBuffer().then((b) => URL.createObjectURL(pcmToWav(b, sampleRate)))
   }
-  const buf =
-    data instanceof ArrayBuffer
-      ? data
-      : data.buffer instanceof ArrayBuffer
-        ? data.buffer.slice(data.byteOffset || 0, (data.byteOffset || 0) + data.byteLength)
-        : null
+  const buf = toArrayBuffer(data)
   if (!buf) return null
   return URL.createObjectURL(pcmToWav(buf, sampleRate))
 }
 
 export function pcmToWav(pcm, sampleRate = 16000) {
-  const len = pcm.byteLength || pcm.length
+  const buf = toArrayBuffer(pcm) || new ArrayBuffer(0)
+  const len = buf.byteLength
   const view = new DataView(new ArrayBuffer(44 + len))
   const w = (off, str) => {
     for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i))
@@ -283,7 +337,6 @@ export function pcmToWav(pcm, sampleRate = 16000) {
   view.setUint16(34, 16, true)
   w(36, 'data')
   view.setUint32(40, len, true)
-  const src = new Uint8Array(pcm instanceof ArrayBuffer ? pcm : pcm.buffer || pcm)
-  new Uint8Array(view.buffer).set(src, 44)
+  new Uint8Array(view.buffer).set(new Uint8Array(buf), 44)
   return new Blob([view.buffer], { type: 'audio/wav' })
 }
