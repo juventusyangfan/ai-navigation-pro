@@ -45,10 +45,16 @@
 
         <!-- 听后选择 -->
         <template v-if="current.type === 'choice'">
-          <button class="btn btn-ghost" :disabled="playing" @click="playCurrent">
-            {{ playing ? '播放中…' : '播放录音' }}
+          <button class="btn btn-ghost" :disabled="playing || replayExhausted" @click="playCurrent">
+            {{ playing ? '播放中…' : (replayExhausted ? '播放次数已用完' : '播放录音') }}
           </button>
-          <p class="muted small">剩余重听次数：{{ replayLeft[current.id] }}</p>
+          <p class="muted small">剩余播放次数：{{ replayLeft[current.id] }}</p>
+          <p v-if="playErr" class="muted small play-warn">{{ playErr }}</p>
+          <!-- 音频确实放不出来时的降级：显示听力原文，避免该题完全无法作答 -->
+          <div v-if="current.audioText && (playFailed || ttsDown)" class="passage ref">
+            <span class="keypoints-title">听力原文（音频无法播放时的降级展示）</span>
+            <div class="ref-text">{{ current.audioText }}</div>
+          </div>
           <p class="question">{{ current.question }}</p>
           <div class="options">
             <button
@@ -70,12 +76,21 @@
           <button
             v-if="current.audioText"
             class="btn btn-ghost"
-            :disabled="playing"
+            :disabled="playing || replayExhausted"
             @click="playCurrent"
           >
-            {{ playing ? '播放中…' : (current.type === 'read_aloud' ? '听示范朗读' : '播放录音') }}
+            {{
+              playing
+                ? '播放中…'
+                : replayExhausted
+                  ? '播放次数已用完'
+                  : current.type === 'read_aloud'
+                    ? '听示范朗读'
+                    : '播放录音'
+            }}
           </button>
-          <p v-if="current.replayLimit" class="muted small">剩余重听次数：{{ replayLeft[current.id] }}</p>
+          <p v-if="current.replayLimit" class="muted small">剩余播放次数：{{ replayLeft[current.id] }}</p>
+          <p v-if="playErr" class="muted small play-warn">{{ playErr }}</p>
 
           <div v-if="current.keyPoints" class="keypoints">
             <span class="keypoints-title">要点提示</span>
@@ -144,10 +159,17 @@
 </template>
 
 <script setup>
-import { computed, onUnmounted, reactive, ref, toRaw } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, toRaw } from 'vue'
 import { GRADES, getPaper } from '../data/paper.js'
 import { navigate } from '../router.js'
-import { play, stopAll, ttsSupported } from '../services/audioPlayer.js'
+import {
+  play,
+  stopAll,
+  unlockAudio,
+  preloadAudio,
+  describePlayError,
+  probeTts
+} from '../services/audioPlayer.js'
 import { startReadAloud, pcmToWav, toArrayBuffer } from '../services/soeSdk.js'
 import { playRecorded, stopPlayback } from '../services/player.js'
 import { buildResult } from '../services/evaluator.js'
@@ -170,12 +192,60 @@ const replayLeft = reactive({})
 const playingId = ref('')
 const playInfo = ref(null)
 const playError = ref('')
+// 题目音频播放（播放录音 / 听示范朗读）专用状态
+const playFailed = ref(false) // 上一次播放是否失败 → 失败时降级展示听力原文
+const playErr = ref('') // 播放失败的可读提示（独立于页面底部通用错误位，避免重复展示）
+// 服务端语音合成是否不可用（页面加载时探测 /api/tts/health）。
+// 不可用时提前降级展示听力原文，而不是等用户点了播放才失败。
+const ttsDown = ref(false)
+
+// ── 播放次数持久化：刷新页面不得重置次数（PC/手机语义一致，也防刷新绕过） ──
+const REPLAY_STORE_PREFIX = 'soe-replay-v1:'
+
+function replayStoreKey() {
+  return REPLAY_STORE_PREFIX + paper.value.id
+}
+
+function restoreReplay() {
+  let saved = {}
+  try {
+    const raw = sessionStorage.getItem(replayStoreKey())
+    saved = raw ? JSON.parse(raw) : {}
+  } catch (e) {
+    saved = {}
+  }
+  Object.keys(saved).forEach((k) => {
+    const n = Number(saved[k])
+    if (Number.isFinite(n)) replayLeft[k] = n
+  })
+}
+
+function persistReplay() {
+  try {
+    sessionStorage.setItem(replayStoreKey(), JSON.stringify({ ...toRaw(replayLeft) }))
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function isReplayExhausted(item) {
+  return !!item && replayLeft[item.id] !== undefined && replayLeft[item.id] <= 0
+}
+
+/** [!] 扣次数只绑定在「确认出声」上（由 play 的 onStart 回调触发），失败不扣 */
+function consumeReplay(item) {
+  if (replayLeft[item.id] === undefined) return
+  if (replayLeft[item.id] <= 0) return
+  replayLeft[item.id] -= 1
+  persistReplay()
+}
 
 const gradeLabel = computed(() => (GRADES.find((g) => g.id === selectedGrade.value) || {}).label || '')
 
 function selectGrade(id) {
   selectedGrade.value = id
   paper.value = getPaper(id)
+  restoreReplay() // 恢复该卷已消耗的播放次数，刷新/切回不重置
 }
 
 const steps = computed(() => {
@@ -195,6 +265,7 @@ const steps = computed(() => {
   return list
 })
 const current = computed(() => steps.value[stepIndex.value])
+const replayExhausted = computed(() => isReplayExhausted(current.value))
 const progressWidth = computed(() => `${((stepIndex.value + 1) / steps.value.length) * 100}%`)
 const answered = computed(() => {
   const a = answers[current.value.id]
@@ -234,15 +305,20 @@ function start() {
     error.value = '请先选择测评年级。'
     return
   }
-  if (!ttsSupported) {
-    error.value = '当前浏览器不支持语音合成，听力题将只显示文本（不影响作答）。'
-  }
+  // [!] 必须在用户手势的同步调用栈内解锁音频通道：iOS/Safari 与多数 WebView
+  //   在解锁前会静默丢弃音频，这是「PC 能播、手机没声音」的头号原因之一。
+  unlockAudio()
+  error.value = ''
   started.value = true
   enterStep()
 }
 
 function enterStep() {
   const item = current.value
+  playFailed.value = false
+  playErr.value = ''
+  // 提前拉取音频：弱网下点「播放录音」能更快出声（只预热缓存，不播放、不扣次数）
+  if (item.audioUrl || item.audioText) preloadAudio(item)
   if (replayLeft[item.id] === undefined && item.replayLimit) replayLeft[item.id] = item.replayLimit
   if (item.type !== 'choice' && item.prepareSec) {
     prepareLeft.value = item.prepareSec
@@ -263,14 +339,22 @@ function skipPrepare() {
 
 async function playCurrent() {
   const item = current.value
-  if (replayLeft[item.id] !== undefined && replayLeft[item.id] <= 0) return
+  if (isReplayExhausted(item)) return
   error.value = ''
+  playErr.value = ''
+  playFailed.value = false
   playing.value = true
   try {
-    await play(item)
-    if (replayLeft[item.id] !== undefined) replayLeft[item.id] -= 1
+    // [!] 扣次数绑定在 onStart（确认出声）回调上，而不是「点击即扣」。
+    //   有真实音频时 onStart 由 <audio> 的 playing 事件触发；无音频退到 TTS 时
+    //   由 onstart 触发。两条路径都能保证「没出声就不扣次数」。
+    await play(item, { onStart: () => consumeReplay(item) })
   } catch (e) {
-    error.value = e.message || '播放失败'
+    // 切题/离开页面导致的主动中断（stopAll 触发）不算失败：不提示、不降级展示原文
+    if (e && e.code === 'PLAY_ABORTED') return
+    // 播放失败：不扣次数 → 给出可操作提示 + 降级展示听力原文
+    playFailed.value = true
+    playErr.value = describePlayError(e)
   } finally {
     playing.value = false
   }
@@ -343,7 +427,7 @@ async function stopRecord() {
   recording.value = false
   evaluating.value = true
   const id = current.value.id
-  c.stop() // ★ 发送结束信令，服务端收到后回 final:1，c.done 才会 resolve；否则永远卡在「评测中」
+  c.stop() // [!] 发送结束信令，服务端收到后回 final:1，c.done 才会 resolve；否则永远卡在「评测中」
 
   // 不论评测成功与否都取出已录音频，便于试听，并写入 answers 确保「下一题」可用。
   // 注意：socket 的 final:1 可能早于 recorder 的 onstop，getAudio() 首次可能为空，稍等重取一次。
@@ -431,7 +515,46 @@ function clearTimers() {
   }
 }
 
+// ── 移动端事件绑定 ───────────────────────────────────────────────────────────
+// 1) 首次用户手势即解锁音频通道。不等到点「开始测评」，以覆盖用户直接点
+//    「播放录音」的场景；iOS/WebView 只认「手势同步栈内」的首次播放。
+function onFirstGesture() {
+  unlockAudio()
+  document.removeEventListener('pointerdown', onFirstGesture)
+  document.removeEventListener('touchstart', onFirstGesture)
+}
+
+// 2) 切后台/离开页面：停止播放并复位 playing。否则 iOS 会挂起播放，
+//    回到前台时按钮永久卡在「播放中…」且再也点不动。
+function haltPlayback() {
+  try {
+    stopAll()
+  } catch (e) {
+    /* ignore */
+  }
+  playing.value = false
+}
+
+function onVisibilityChange() {
+  if (document.hidden) haltPlayback()
+}
+
+onMounted(() => {
+  // 服务端语音合成能力探测：未就绪时提前降级，避免「点了播放没声音」
+  probeTts().then((ok) => {
+    ttsDown.value = !ok
+  })
+  document.addEventListener('pointerdown', onFirstGesture, { passive: true })
+  document.addEventListener('touchstart', onFirstGesture, { passive: true })
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('pagehide', haltPlayback)
+})
+
 onUnmounted(() => {
+  document.removeEventListener('pointerdown', onFirstGesture)
+  document.removeEventListener('touchstart', onFirstGesture)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('pagehide', haltPlayback)
   clearTimers()
   stopAll()
   stopPlayback()
@@ -493,5 +616,14 @@ onUnmounted(() => {
   margin-top: 6px;
   line-height: 1.6;
   color: var(--text);
+}
+.play-warn {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff8e1;
+  border: 1px solid #ffe0a3;
+  color: #8a6100;
+  line-height: 1.5;
 }
 </style>
