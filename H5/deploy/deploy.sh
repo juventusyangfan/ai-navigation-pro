@@ -20,7 +20,9 @@ npm install --no-audit --no-fund
 echo "[3/5] 构建静态资源"
 npm run build
 
-echo "[4/5] 启动/保活密钥服务（智聆 SDK 需 /api/soe/credential）"
+echo "[4/5] 启动/保活后端服务（/api/soe/credential 凭证 + /api/tts/audio 语音合成）"
+# 提示：听力音频依赖腾讯云语音合成，需先在控制台开通并领取免费资源包（README §8.3）
+#      开通后可用 `npm run tts:check` 逐条自检合成结果
 if command -v pm2 >/dev/null 2>&1; then
   pm2 describe h5-soe-cred >/dev/null 2>&1 && pm2 restart h5-soe-cred || pm2 start server/index.mjs --name h5-soe-cred
 else
