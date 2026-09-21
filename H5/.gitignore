@@ -6,4 +6,5 @@ dist
 .env.*
 !.env.example
 certs/
+server/.cache/
 package-lock.json
