@@ -111,10 +111,19 @@ server.listen(PORT, () => {
   if (soeCfg.mode === 'static') console.log('[soe] 警告：正在下发永久密钥（SOE_ALLOW_STATIC=1），仅限本地调试！')
   tts
     .health()
-    .then((h) => {
-      console.log(`[tts] ok=${h.ok} configured=${h.configured} library=${h.library} voices=${JSON.stringify(h.voices)}`)
+    .then(async (h) => {
+      console.log(`[tts] configured=${h.configured} library=${h.library} voices=${JSON.stringify(h.voices)}`)
       if (!h.configured) console.log('[tts] 未配置密钥，/api/tts/audio 将返回 503')
       if (!h.library) console.log('[tts] 缺少依赖：npm i tencentcloud-sdk-nodejs-tts')
+      if (!h.configured || !h.library) return
+      const p = await tts.probeOnce()
+      if (p.ok) {
+        console.log(`[tts] 合成可用（探针 ${p.bytes} B${p.cached ? '，命中缓存' : ''}）`)
+      } else {
+        // 这里必须打出原因：否则服务起来一切「正常」，只有点播放才知道是坏的
+        console.log(`[tts] 合成不可用 [${p.reason}] ${p.message}`)
+        console.log('[tts] 排障：npm run tts:check')
+      }
     })
     .catch(() => console.log('[tts] 健康检查失败'))
 })

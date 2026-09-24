@@ -151,7 +151,11 @@ export function describePlayError(e) {
     case 'TTS_UNAVAILABLE':
       return '服务端语音合成暂不可用，本题音频无法播放，请稍后重试。'
     case 'AUDIO_LOAD_FAILED':
-      return '音频加载失败，请检查网络后重试。'
+      // 音源是服务端合成时，失败原因基本不可能是用户网络，
+      // 指向网络会让排查跑偏（真实原因多为密钥失效 / 服务未开通 / 配额用尽）。
+      return lastPlayWasTts
+        ? '服务端合成音频加载失败（非网络问题），请执行 npm run tts:check 查看具体原因。'
+        : '音频加载失败，请检查网络后重试。'
     case 'AUDIO_PLAY_BLOCKED':
       return '浏览器拦截了本次音频播放，请再点一次「播放录音」。'
     default:
@@ -275,13 +279,18 @@ export function play(item, opts = {}) {
   // 服务端合成未就绪时立即给出明确失败，不让用户白等 8 秒
   if (usesServerTts(item) && ttsReady === false) {
     stopAll()
-    return Promise.reject(makeError('TTS_UNAVAILABLE', '服务端语音合成不可用'))
+    // 带上探针原因，让用户看到「密钥失效」而不是一句笼统的「不可用」
+    const reason = ttsHealth && ttsHealth.probe && ttsHealth.probe.message
+    return Promise.reject(
+      makeError('TTS_UNAVAILABLE', '服务端语音合成不可用' + (reason ? `：${reason}` : ''))
+    )
   }
 
   // 1) 真人 / 官方录音优先
   // 2) 服务端语音合成
   const text = (item.audioText || '').trim()
   const url = item.audioUrl || (text ? ttsAudioUrl(text) : '')
+  lastPlayWasTts = !!text && !item.audioUrl
   if (!url) {
     stopAll()
     return Promise.resolve({ played: false, reason: 'NO_SOURCE' })

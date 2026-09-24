@@ -60,6 +60,11 @@ const SOE_HINTS = [
   ],
   [/欠费|余额不足|arrears|insufficient/i, '账号欠费或免费额度已用完，请在控制台充值或购买资源包。'],
   [
+    /密钥不存在|已被删除|禁用|SecretIdNotFound|4002/i,
+    '密钥不存在或已被删除/禁用：请到 https://console.cloud.tencent.com/cam/capi 检查该 SecretId 状态，' +
+      '重新启用或新建后更新 server/.env（服务端语音合成会同步失效）。'
+  ],
+  [
     /签名|鉴权|AuthFail|鉴权失败|Signature/i,
     '签名校验失败：请核对 SecretId / SecretKey / AppId 三者是否匹配同一账号（AppId 是腾讯云账号 APPID，不是微信 AppId）。'
   ],
