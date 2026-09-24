@@ -12,8 +12,9 @@
 cd ai-navigation-pro/H5
 
 npm install        # 安装依赖（含腾讯云 TTS / STS SDK）
+npm run cert       # 生成自签 HTTPS 证书到 certs/（手机真机测录音必需；只需一次）
 npm run server     # 本地服务：凭证下发 + 语音合成（:8787，dev 已把 /api 代理过来）
-npm run dev        # 本地开发，默认 https://localhost:5173（本地证书，麦克风必需 HTTPS）
+npm run dev        # 本地开发，https://localhost:5173（certs/ 存在时走 HTTPS）
 npm run build      # 构建静态资源到 dist/
 npm run preview    # 预览构建产物，http://localhost:4173
 
@@ -29,12 +30,38 @@ node --test scripts/test-tts.mjs   # 服务端合成逻辑单测
 
 | 环境 | 地址 |
 |---|---|
-| 本地开发 | http://localhost:5173 |
+| 本地开发 | https://localhost:5173（未生成证书时自动降级 http://localhost:5173） |
 | 本地预览构建产物 | http://localhost:4173 |
-| 手机同局域网真机调试 | http://<电脑内网IP>:5173 （`npm run dev` 已开 `--host`） |
+| 手机同局域网真机调试 | https://<电脑内网IP>:5173 （`npm run dev` 已开 `--host`） |
 | 生产（腾讯云） | https://h5.eanavi.com |
 
-> **注意：录音必须在安全上下文下才能用**：只有 `https://` 或 `localhost` 能调用麦克风。真机调试请用内网 IP 时，Chrome 会禁用麦克风 —— 真机测录音请走下面第三节的 HTTPS 域名，或用 Chrome 的 `chrome://flags/#unsafely-treat-insecure-origin-as-secure` 临时放行。
+> **注意：录音必须在安全上下文下才能用**：只有 `https://` 或 `localhost` 能调用麦克风。用内网 IP 直连 http 时 Chrome 会禁用麦克风 —— 真机测录音请先 `npm run cert` 再走 https，或访问生产 HTTPS 域名，或用 Chrome 的 `chrome://flags/#unsafely-treat-insecure-origin-as-secure` 临时放行。
+
+**HTTPS 证书（`npm run cert`）**
+
+- 脚本会自动探测 openssl（优先本机 Git 自带的 `PortableGit/usr/bin/openssl.exe`），生成 RSA-2048 / 365 天自签证书到 `certs/`，并把 `localhost`、`127.0.0.1` 与**本机全部局域网 IP** 写进 SAN，手机可直接访问。
+- **证书不存在时 `npm run dev` 不会崩**，会自动降级 http 并在控制台提示（提示为纯 ASCII，避免 GBK 控制台乱码）。
+- 自签证书浏览器会告警，点「高级 / 继续访问」即可；**iOS Safari 对自签证书常直接拒绝 getUserMedia**，真机优先用安卓 Chrome 或生产 HTTPS 域名。
+- 机器上没有 openssl 时，脚本会给出安装指引（`winget install GnuWin32.OpenSSL` / `choco install openssl`，或改用 `mkcert`）。
+
+**启动报错速查**
+
+| 报错 | 原因 / 处理 |
+|---|---|
+| `ENOENT: no such file or directory, open '...\certs\key.pem'` | 配置引用了证书但还没生成。执行 `npm run cert`；新版配置已加降级，缺证书也会以 http 启动而不崩 |
+| `TypeError: crypto$2.getRandomValues is not a function` | Node 版本过低（<18）。`nvm install 22 && nvm use 22`，`npm run dev` 前会自动预检 |
+| 端口被占用 | 换端口：`npm run dev -- --port 5174` |
+
+**运行时报错速查**
+
+| 现象 | 原因 / 处理 |
+|---|---|
+| 播放听力提示「服务端合成音频加载失败（非网络问题）」 | **先跑 `npm run tts:check`**，它会直接打出上游原因。此提示已刻意不提网络——音源是服务端合成时，失败几乎不可能是用户网络 |
+| `The SecretId is not found` / `AuthFailure.SecretIdNotFound` / 智聆 `code:4002` | **密钥已被删除或禁用**，不是服务未开通。到 https://console.cloud.tencent.com/cam/capi 检查该 SecretId 状态，重新启用或新建后更新 `server/.env`。⚠️ 智聆评测与语音合成共用同一套 CAM 鉴权，**会同时失效** |
+| `UnsupportedOperation.ServerNotOpen` | 语音合成未开通：https://console.cloud.tencent.com/tts 开通并领取免费资源包 |
+| `/api/tts/audio` 返回 403 | 该文本不在题库白名单（防配额盗刷）。属预期行为，改用题库内文本即可 |
+
+> 判定密钥是否失效的可靠方法：用**正确 SecretId + 任意错误 SecretKey** 调一次 CAM。若仍返回 `SecretIdNotFound`（而非签名错误），即可确认该密钥在 CAM 已不存在/被禁用。
 
 ---
 
