@@ -220,7 +220,12 @@ export function describeUpstreamError(e) {
     'InvalidParameterValue.VoiceType': 'VoiceType 音色 ID 非法，请核对 TTS_VOICE_* 配置',
     'InvalidParameterValue.SampleRate': 'SampleRate 非法：精品音色最高 16k，大模型音色支持 24k',
     'UnsupportedOperation.AuthorizationFailed': '鉴权失败：请核对密钥与语音合成的 CAM 授权',
-    'AuthFailure.InvalidAuthorization': '授权无效：请核对 TTS_SECRET_ID / TTS_SECRET_KEY'
+    'AuthFailure.InvalidAuthorization': '授权无效：请核对 TTS_SECRET_ID / TTS_SECRET_KEY',
+    // 密钥被删除或禁用时，CAM 层直接返回此项 —— 与「服务未开通」是两回事，必须分开提示，
+    // 否则会误导去开通服务。注意：密钥无效会让智聆评测同步失效（同一套 CAM 鉴权）。
+    'AuthFailure.SecretIdNotFound':
+      '密钥不存在或已被删除/禁用：请到 https://console.cloud.tencent.com/cam/capi ' +
+      '检查该 SecretId 状态，重新启用或新建后更新 server/.env（智聆评测会同步受影响）'
   }
   return tips[code] || raw
 }
@@ -411,6 +416,20 @@ export async function probe() {
   } catch (e) {
     return { ok: false, reason: e.code || 'ERROR', message: e.message }
   }
+}
+
+// ── 探针结果缓存 ─────────────────────────────────────────────────────────────
+// 为什么要缓存：probe() 会真实合成一次。前端每次进页面都会打 /api/tts/health，
+// 不缓存就会重复调用上游（虽然命中磁盘缓存不计费，但仍有请求开销）。
+// 进程内只做一次；密钥换掉后调 invalidateProbe() 或重启服务即可。
+let probeCache = null
+export function invalidateProbe() {
+  probeCache = null
+}
+export async function probeOnce(force = false) {
+  if (probeCache && !force) return probeCache
+  probeCache = await probe()
+  return probeCache
 }
 
 /** 健康检查：供前端探测服务端合成能力，未就绪时提前降级而不是等播放失败 */

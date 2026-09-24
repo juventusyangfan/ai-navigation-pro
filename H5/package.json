@@ -9,6 +9,7 @@
   },
   "scripts": {
     "check": "node scripts/check-node.mjs",
+    "cert": "node scripts/gen-cert.mjs",
     "server": "node server/index.mjs",
     "dev": "node scripts/check-node.mjs && vite --host",
     "build": "node scripts/check-node.mjs && vite build",
