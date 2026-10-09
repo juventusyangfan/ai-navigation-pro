@@ -31,6 +31,7 @@ let unlocked = false // 音频通道是否已解锁
 let currentAbort = null // 当前挂起播放的终结函数（stopAll 时主动调用，避免 Promise 悬挂）
 let ttsReady = null // null=未探测 true/false=服务端合成是否可用
 let ttsHealth = null
+let lastPlayWasTts = false // 最近一次 play() 的音源是否为服务端合成，供 describePlayError() 精准归因
 
 function makeError(code, message) {
   const e = new Error(message)
@@ -200,6 +201,15 @@ function playFile(url, onStart) {
       if (audioEl === el) audioEl = null
       try {
         el.pause()
+      } catch (e) {
+        /* ignore */
+      }
+      // [!] pause() 只停声，不中止后台下载。这里必须和 stopAll() 一样摘掉 src，
+      //   否则「跳过准备 / 开始录音」中断一次 TTS 流式音频后，元素仍在继续拉流占带宽。
+      //   注意 fail() 会先把 audioEl 置为 null，所以 stopAll() 里那段摘 src 的代码
+      //   在中止路径上永远不会执行——收尾必须在这里做，不能指望那边。
+      try {
+        el.removeAttribute('src')
       } catch (e) {
         /* ignore */
       }
