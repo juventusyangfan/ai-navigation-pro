@@ -10,6 +10,7 @@ const NAV: { group: string; items: { href: string; label: string }[] }[] = [
       { href: "/admin", label: "仪表盘" },
       { href: "/admin/tools", label: "工具管理" },
       { href: "/admin/collect", label: "采集中心" },
+      { href: "/admin/radar", label: "赛事雷达" },
       { href: "/admin/submissions", label: "投稿审核" },
       { href: "/admin/sops", label: "SOP 编辑器" },
       { href: "/admin/usages", label: "用法库" },
