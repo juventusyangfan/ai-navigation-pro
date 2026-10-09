@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { requireAdmin, ok, fail } from "@/lib/http";
 import { editionTitle } from "@/lib/radar/parse";
 import { toApiEdition } from "@/lib/radar/serialize";
+import { guarded } from "@/lib/radar/route-guard";
 import { todayIso } from "@/lib/radar/gate";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,10 @@ export const dynamic = "force-dynamic";
  * 「上传历史」页读这个接口；每条批次都能整批回滚。
  */
 export async function GET() {
+  return guarded("radar/editions:list", () => handleList());
+}
+
+async function handleList() {
   const guard = await requireAdmin("radar", "read");
   if (guard.error) return guard.error;
 
@@ -23,6 +28,10 @@ export async function GET() {
 
 /** 手工新建一个空白期次：纯手工录入场景（本周技能未产出时也能开工） */
 export async function POST(req: Request) {
+  return guarded("radar/editions:create", () => handleCreate(req));
+}
+
+async function handleCreate(req: Request) {
   const guard = await requireAdmin("radar", "write");
   if (guard.error) return guard.error;
 

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireAdmin, ok, fail } from "@/lib/http";
 import { toApiEdition, toApiItem } from "@/lib/radar/serialize";
+import { guarded } from "@/lib/radar/route-guard";
 import { gateCodeLabel, recheckPublishable, todayIso } from "@/lib/radar/gate";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,11 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
 /** 期次详情：含条目明细（被拦截的也返回，作为门槛有效性的证据） */
-export async function GET(_req: Request, { params }: Ctx) {
+export async function GET(_req: Request, ctx: Ctx) {
+  return guarded("radar/edition:get", () => handleGet(ctx));
+}
+
+async function handleGet({ params }: Ctx) {
   const guard = await requireAdmin("radar", "read");
   if (guard.error) return guard.error;
 
@@ -33,7 +38,11 @@ export async function GET(_req: Request, { params }: Ctx) {
  *  action: "rollback"  → 回滚该批次：条目全部归档，释放文件指纹以便重新导入
  *  action: "update"    → 改标题 / 备注
  */
-export async function PATCH(req: Request, { params }: Ctx) {
+export async function PATCH(req: Request, ctx: Ctx) {
+  return guarded("radar/edition:patch", () => handlePatch(req, ctx));
+}
+
+async function handlePatch(req: Request, { params }: Ctx) {
   const { id } = await params;
   const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const action = String(b.action ?? "");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { readApi } from "@/lib/radar/api-client";
 
 interface Edition {
   id: string;
@@ -19,6 +20,17 @@ interface Edition {
   publishedAt?: string;
   note?: string;
   createdAt: string;
+}
+
+/** 期次级动作（publish / rollback）的响应 */
+interface ActResp {
+  published?: number;
+  rolledBack?: number;
+  autoArchived?: { name: string; reason: string }[];
+}
+
+interface CreateEditionResp {
+  title: string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -53,12 +65,14 @@ export default function HistoryPanel({ refreshKey, onDone }: { refreshKey: numbe
   const [newEnd, setNewEnd] = useState("");
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/radar/editions");
-    if (!res.ok) {
-      setErr("加载期次列表失败");
-      return;
+    try {
+      const res = await fetch("/api/admin/radar/editions");
+      setList(await readApi<Edition[]>(res));
+      setErr("");
+    } catch (e) {
+      // 不再吞掉原因：区分「数据库缺表」「未登录」「网关挂了」对运维是第一手线索
+      setErr(e instanceof Error ? e.message : "加载期次列表失败");
     }
-    setList((await res.json()) as Edition[]);
   }, []);
 
   useEffect(() => {
@@ -75,8 +89,7 @@ export default function HistoryPanel({ refreshKey, onDone }: { refreshKey: numbe
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action, note, ...extra }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "操作失败");
+      const data = await readApi<ActResp>(res);
       if (action === "publish") {
         const auto = (data.autoArchived ?? []) as { name: string; reason: string }[];
         setMsg(
@@ -109,8 +122,7 @@ export default function HistoryPanel({ refreshKey, onDone }: { refreshKey: numbe
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ runDate: newDate, windowStart: newStart, windowEnd: newEnd }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "新建失败");
+      const data = await readApi<CreateEditionResp>(res);
       setMsg(`已新建空白期次「${data.title}」，可到「条目维护」手工录入。`);
       setNewDate("");
       setNewStart("");

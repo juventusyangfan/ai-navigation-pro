@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireAdmin, ok, fail } from "@/lib/http";
 import { toApiItem } from "@/lib/radar/serialize";
+import { guarded } from "@/lib/radar/route-guard";
 import type { RadarEvent } from "@prisma/client";
 import { evaluateCandidate, gateCodeLabel, recheckPublishable, todayIso } from "@/lib/radar/gate";
 
@@ -42,7 +43,11 @@ function rowToRaw(e: RadarEvent): Record<string, unknown> {
   };
 }
 
-export async function GET(_req: Request, { params }: Ctx) {
+export async function GET(_req: Request, ctx: Ctx) {
+  return guarded("radar/event:get", () => handleGet(ctx));
+}
+
+async function handleGet({ params }: Ctx) {
   const guard = await requireAdmin("radar", "read");
   if (guard.error) return guard.error;
   const { id } = await params;
@@ -59,7 +64,11 @@ export async function GET(_req: Request, { params }: Ctx) {
  *  action: "archive" → 下架（软删除，必填原因）
  *  action: "restore" → 从下架恢复
  */
-export async function PATCH(req: Request, { params }: Ctx) {
+export async function PATCH(req: Request, ctx: Ctx) {
+  return guarded("radar/event:patch", () => handlePatch(req, ctx));
+}
+
+async function handlePatch(req: Request, { params }: Ctx) {
   const { id } = await params;
   const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const action = String(b.action ?? "update");
