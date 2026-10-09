@@ -98,8 +98,21 @@
 
 <script>
 (function () {
-  // 数据源：admin 后台的公开只读接口。改域名只需改这一行。
-  var API = "https://admin.eanavi.com/api/content/radar";
+  // 数据源：admin 后台的公开只读接口。
+  // 按当前 hostname 自动选择——绝不能把 localhost 硬编码进线上版本，
+  // 那样部署到 h5.eanavi.com 后，它会去请求**访问者自己电脑**的 3001 端口，必然失败。
+  //   - 本地预览（localhost / 127.0.0.1 / [::1]）→ 本机 admin dev server
+  //   - 其他（线上）                              → https://admin.eanavi.com
+  // 调试时可用 ?api=<完整地址> 覆盖。
+  var API_PROD = "https://admin.eanavi.com/api/content/radar";
+  var API_DEV = "http://localhost:3001/api/content/radar";
+  var API = (function () {
+    var m = /[?&]api=([^&]*)/.exec(location.search);
+    if (m) return decodeURIComponent(m[1]);
+    var h = location.hostname;
+    if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "") return API_DEV;
+    return API_PROD;
+  })();
 
   var app = document.getElementById("app");
   var editionBox = document.getElementById("edition");
