@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>武汉教育赛事雷达</title>
+<meta name="description" content="汇总武汉本地面向小学、初中、高中学生与教师的赛事与活动信息，仅作信息告知。">
+<style>
+  :root{
+    --ink:#1f2430; --muted:#6b7280; --line:#e6e8ec; --bg:#f5f6f8; --card:#fff;
+    --brand:#2f6bff; --ok:#0f9960; --warn:#d97706; --danger:#d92d20;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    font-size:15px;line-height:1.6;
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:16px 14px 40px}
+  header.hd{padding:6px 2px 14px}
+  header.hd h1{font-size:21px;margin:0 0 6px;letter-spacing:.2px}
+  header.hd .sub{color:var(--muted);font-size:12.5px;line-height:1.5}
+
+  .edition{
+    background:#fff;border:1px solid var(--line);border-radius:12px;
+    padding:12px 14px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;
+  }
+  .edition .k{color:var(--muted);font-size:12px}
+  .edition .v{font-weight:600;font-size:13.5px}
+  .edition .stale{color:var(--warn);font-size:12px;width:100%}
+
+  .sec{display:flex;align-items:baseline;gap:8px;margin:18px 2px 10px}
+  .sec h2{font-size:16px;margin:0}
+  .sec span{color:var(--muted);font-size:12px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .card .ttl{font-size:16px;font-weight:700;line-height:1.4;margin:0 0 8px}
+  .card .tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .tag{font-size:11.5px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:#fafbfc}
+  .tag.hot{color:#fff;background:var(--brand);border-color:var(--brand)}
+  .row{display:flex;gap:8px;font-size:13.5px;padding:4px 0;border-top:1px dashed #f0f1f4}
+  .row:first-of-type{border-top:0}
+  .row .k{flex:0 0 62px;color:var(--muted);font-size:12.5px}
+  .row .v{flex:1;min-width:0;word-break:break-word}
+  .row .v a{color:var(--brand);text-decoration:none;word-break:break-all}
+  .subline{margin-top:8px;padding-top:8px;border-top:1px solid #f0f1f4;font-size:12.5px;color:var(--muted)}
+  .subline b{color:var(--ink);font-weight:600}
+  .guard{margin-top:10px;font-size:12px;color:var(--muted);background:#f8f9fb;border-radius:8px;padding:7px 9px;line-height:1.5}
+
+  table.tb{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  table.tb th,table.tb td{text-align:left;padding:9px 10px;font-size:13px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.tb th{background:#fafbfc;color:var(--muted);font-weight:600;font-size:12px}
+  table.tb tr:last-child td{border-bottom:0}
+  table.tb .nm{font-weight:600}
+  table.tb .org{color:var(--muted);font-size:12px;margin-top:2px}
+
+  .brief{background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px 14px}
+  .brief .brow{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px dashed #f0f1f4;font-size:13px}
+  .brief .brow:last-child{border-bottom:0}
+  .brief .brow .bl{flex:1;min-width:0}
+  .brief .brow .bn{font-weight:600}
+  .brief .brow .bo{color:var(--muted);font-size:12px}
+  .brief .brow .bd{flex:0 0 auto;text-align:right;color:var(--muted);font-size:12px;white-space:nowrap}
+
+  .state{background:#fff;border:1px solid var(--line);border-radius:12px;padding:26px 18px;text-align:center}
+  .state .em{font-size:15px;font-weight:600;margin-bottom:6px}
+  .state .ds{color:var(--muted);font-size:13px;line-height:1.6}
+  .state.err{border-color:#fecdd3;background:#fffafa}
+  .state.err .em{color:var(--danger)}
+  .retry{margin-top:14px;display:inline-block;padding:8px 20px;border-radius:8px;background:var(--brand);color:#fff;font-size:13.5px;border:0}
+  .loading{text-align:center;color:var(--muted);padding:40px 0;font-size:13.5px}
+  .skel{background:#fff;border:1px solid var(--line);border-radius:12px;height:96px;margin-bottom:12px;opacity:.6}
+
+  footer.ft{margin-top:24px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7}
+  footer.ft .disc{color:#8a909c}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hd">
+    <h1>武汉教育赛事雷达</h1>
+    <div class="sub">汇总武汉本地面向小学、初中、高中学生与教师的赛事与活动</div>
+  </header>
+
+  <div id="edition" style="display:none" class="edition"></div>
+  <main id="app">
+    <div class="skel"></div><div class="skel"></div>
+    <div class="loading">正在加载…</div>
+  </main>
+
+  <footer class="ft">
+    信息来源为公开渠道，本平台仅作信息告知，<b>不组织报名、不代收作品、不开展赛事培训、不承诺获奖结果</b>，亦不与升学、评优关联表述。<br>
+    <span class="disc">具体赛制与报名要求请以主办方官方通知为准。</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  // 数据源：admin 后台的公开只读接口。改域名只需改这一行。
+  var API = "https://admin.eanavi.com/api/content/radar";
+
+  var app = document.getElementById("app");
+  var editionBox = document.getElementById("edition");
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function rows(list) {
+    return list.filter(function (x) { return x && x.v; })
+      .map(function (x) {
+        return '<div class="row"><div class="k">' + esc(x.k) + '</div><div class="v">' + x.v + '</div></div>';
+      }).join("");
+  }
+
+  function link(url, label) {
+    if (!url) return "";
+    var safe = esc(url);
+    return '<a href="' + safe + '" rel="noopener noreferrer">' + esc(label || url) + '</a>';
+  }
+
+  function dayText(n) {
+    if (typeof n !== "number" || !isFinite(n)) return "";
+    if (n === 0) return "今天截止";
+    if (n > 0) return "剩 " + n + " 天";
+    return "已过期";
+  }
+
+  function mainCard(it) {
+    var tags = ['<span class="tag hot">' + esc(it.categoryLabel) + '</span>'];
+    if (it.gradeLabel) tags.push('<span class="tag">' + esc(it.gradeLabel) + '</span>');
+    if (it.roleLabel) tags.push('<span class="tag">' + esc(it.roleLabel) + '</span>');
+    if (it.regionLabel) tags.push('<span class="tag">' + esc(it.regionLabel) + '</span>');
+
+    var body = rows([
+      { k: "主办方", v: esc(it.organizer) },
+      it.coOrganizer ? { k: "承办", v: esc(it.coOrganizer) } : null,
+      { k: "参赛对象", v: esc(it.audienceRaw) },
+      { k: it.keyDateTypeLabel, v: esc(it.keyDate) + (dayText(it.daysToKeyDate) ? ' <span class="tag">' + dayText(it.daysToKeyDate) + '</span>' : "") },
+      it.timeRange ? { k: "活动时间", v: esc(it.timeRange) } : null,
+      it.location ? { k: "地点", v: esc(it.location) } : null,
+      { k: "费用", v: esc(it.feeLabel) },
+      { k: "报名方式", v: esc(it.signupMethod) },
+      it.notes ? { k: "备注", v: esc(it.notes) } : null,
+      { k: "信息来源", v: link(it.sourceUrl, it.sourceName) }
+    ].filter(Boolean));
+
+    var sib = "";
+    if (it.siblings && it.siblings.length) {
+      sib = '<div class="subline">同系列：' + it.siblings.map(function (s) {
+        var bits = [];
+        if (s.location) bits.push(s.location);
+        if (s.signupMethod) bits.push(s.signupMethod);
+        return esc(s.name) + (bits.length ? "（" + esc(bits.join("；")) + "）" : "");
+      }).join("；") + '</div>';
+    }
+
+    return '<div class="card">' +
+      '<h3 class="ttl">' + esc(it.name) + '</h3>' +
+      '<div class="tags">' + tags.join("") + '</div>' +
+      body + sib +
+      (it.complianceNote ? '<div class="guard">' + esc(it.complianceNote) + '</div>' : "") +
+      '</div>';
+  }
+
+  function altTable(list) {
+    return '<table class="tb"><thead><tr><th>活动</th><th>参赛对象</th><th style="width:96px">关键节点</th></tr></thead><tbody>' +
+      list.map(function (it) {
+        return '<tr><td><div class="nm">' + esc(it.name) + '</div><div class="org">' + esc(it.organizer) + '</div></td>' +
+          '<td>' + esc(it.gradeLabel) + '<div class="org">' + esc(it.roleLabel) + '</div></td>' +
+          '<td>' + esc(it.keyDateTypeLabel) + '<div class="org">' + esc(it.keyDate) + '</div></td></tr>';
+      }).join("") + '</tbody></table>';
+  }
+
+  function briefBlock(list) {
+    return '<div class="brief">' + list.map(function (it) {
+      return '<div class="brow"><div class="bl"><div class="bn">' + esc(it.name) + '</div>' +
+        '<div class="bo">' + esc(it.organizer) + '</div></div>' +
+        '<div class="bd">' + esc(it.keyDateTypeLabel) + '<br>' + esc(it.keyDate) + '</div></div>';
+    }).join("") + '</div>';
+  }
+
+  function renderEdition(ed, isFallback) {
+    if (!ed) { editionBox.style.display = "none"; return; }
+    var win = ed.windowStart && ed.windowEnd ? ed.windowStart + " ~ " + ed.windowEnd : ed.runDate;
+    editionBox.style.display = "flex";
+    editionBox.innerHTML =
+      '<div><div class="k">本期覆盖</div><div class="v">' + esc(win) + '</div></div>' +
+      (ed.publishedAt ? '<div><div class="k">发布</div><div class="v">' + esc(String(ed.publishedAt).slice(0, 10)) + '</div></div>' : '') +
+      (isFallback ? '<div class="stale">本期暂未更新，以下为上述期次发布的内容</div>' : '');
+  }
+
+  function render(data) {
+    var groups = data.groups || { A: [], B: [], C: [] };
+    var total = groups.A.length + groups.B.length + groups.C.length;
+
+    // 空态一：功能从未开张
+    if (data.status === "no-edition") {
+      renderEdition(null, false);
+      app.innerHTML = stateBlock("栏目筹备中", data.notice || "「赛事雷达」正在筹备中，上线后将在此展示武汉本地的赛事与活动。");
+      return;
+    }
+    // 空态二：曾发布过，但当前无在线期次（人工下线/维护）
+    if (data.status === "offline") {
+      renderEdition(null, false);
+      app.innerHTML = stateBlock("栏目维护中", data.notice || "本栏目暂时维护中，请稍后再来查看。");
+      return;
+    }
+    // 空态三：有期次但本期无内容，且历史也无内容可回退
+    if (!total) {
+      renderEdition(data.edition, false);
+      app.innerHTML = stateBlock("本期暂无新增", data.notice || "本期暂无符合条件的新增赛事活动，敬请关注下期更新。");
+      return;
+    }
+
+    renderEdition(data.edition, !!data.isFallback);
+
+    var html = "";
+    if (data.notice) html += '<div class="state" style="padding:14px 16px;text-align:left"><div class="ds">' + esc(data.notice) + '</div></div><div style="height:12px"></div>';
+    if (groups.A.length) {
+      html += '<div class="sec"><h2>本期主推</h2><span>' + groups.A.length + ' 项</span></div>';
+      html += groups.A.map(mainCard).join("");
+    }
+    if (groups.B.length) {
+      html += '<div class="sec"><h2>其他活动</h2><span>可一并了解</span></div>';
+      html += altTable(groups.B);
+    }
+    if (groups.C.length) {
+      html += '<div class="sec"><h2>本周简讯</h2><span>了解动态，不作主推</span></div>';
+      html += briefBlock(groups.C);
+    }
+    app.innerHTML = html;
+  }
+
+  function stateBlock(title, desc) {
+    return '<div class="state"><div class="em">' + esc(title) + '</div><div class="ds">' + esc(desc) + '</div></div>';
+  }
+
+  /**
+   * 空态四：技术故障。
+   * 绝不能显示「本周暂无活动」——那会把故障伪装成正常，用户以为没问题，我们也永远发现不了。
+   */
+  function renderError(msg) {
+    editionBox.style.display = "none";
+    app.innerHTML =
+      '<div class="state err"><div class="em">加载失败，请重试</div>' +
+      '<div class="ds">未能连接到内容服务' + (msg ? '（' + esc(msg) + '）' : '') + '。<br>这不代表本周没有活动。</div>' +
+      '<button class="retry" id="retryBtn">重新加载</button></div>';
+    var btn = document.getElementById("retryBtn");
+    if (btn) btn.addEventListener("click", load);
+  }
+
+  var loading = false;
+  function load() {
+    if (loading) return;
+    loading = true;
+    app.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="loading">正在加载…</div>';
+    var url = API + (API.indexOf("?") >= 0 ? "&" : "?") + "t=" + Date.now();
+    fetch(url, { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (data) { render(data); })
+      .catch(function (e) { renderError(e && e.message ? e.message : ""); })
+      .then(function () { loading = false; });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

@@ -346,3 +346,106 @@ model EventDaily {
   @@unique([day, name, refType, refId])
   @@index([day])
 }
+
+// ---------------- 武汉教育赛事雷达（radar） ----------------
+// 链路：wuhan-edu-event-radar 技能产出候选池 JSON → 本模块导入 → 人工过审 → 发布 → 前台读取。
+//
+// 合规基线（硬约束，不可放宽）：
+//  - 发布对象的四道硬门槛（地域 / 对象 / 时效 / 信源层级 ≤3）在服务端强制复刻，不信任录入者；
+//    「内容生产」归 radar.py，「内容审核」归本模块，前台只读已发布态。
+//  - 一律软删除（status=archived + archiveReason），保留审计轨迹。
+
+/// 期次 + 导入批次。定时任务一次运行 = 一个期次 = 一批导入；手工新增的条目挂到当前编辑期。
+model RadarEdition {
+  id            String   @id @default(cuid())
+  runDate       String                        // 运行日 "2026-10-09"
+  windowStart   String                        // 覆盖窗口起 "2026-10-12"
+  windowEnd     String                        // 覆盖窗口止 "2026-10-18"
+  title         String                        // 展示标题，如「2026 年第 41 周（10/12—10/18）」
+
+  // —— 导入批次信息（手工新建的空白期次留空）——
+  fileName      String?
+  fileHash      String?  @unique              // 同一文件重复上传直接拦截
+  schemaVersion String?
+  rawMeta       String   @default("{}")       // 原始 meta JSON（保留来源全貌）
+  totalCount    Int      @default(0)          // 本次上传总条数
+  acceptedCount Int      @default(0)          // 通过硬门槛
+  blockedCount  Int      @default(0)          // 被硬门槛拦截（同样入库，作门槛有效性证据）
+
+  // —— 发布态 ——
+  status        String   @default("draft")    // draft|published|hidden|rolled_back
+  publishedAt   DateTime?
+  publishedBy   String?
+  note          String?                       // 人工备注（为什么整期下架等）
+
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  events        RadarEvent[]
+
+  @@index([status, runDate])
+  @@index([runDate])
+}
+
+/// 单条活动。externalId 为技能侧 SHA1 去重键，跨周稳定，保证重复导入幂等。
+model RadarEvent {
+  id            String        @id @default(cuid())
+  editionId     String?
+  edition       RadarEdition? @relation(fields: [editionId], references: [id], onDelete: SetNull)
+  externalId    String?                            // 技能产出 id；手工新增同样按名称生成，便于识别重复
+  source        String        @default("radar")    // radar|manual
+
+  // —— 业务字段（与技能 schema 对齐）——
+  name          String
+  organizer     String
+  coOrganizer   String?
+  audienceRaw   String
+  grades        String        @default("[]")       // JSON string[]：primary|junior|senior
+  roles         String        @default("[]")       // JSON string[]：student|teacher
+  category      String        @default("general")  // english|stem|reading|arts|sports|general
+  region        String        @default("wuhan")    // wuhan|hubei|district
+  keyDate       String                             // "YYYY-MM-DD"，排序主轴
+  keyDateType   String                             // signup_start|signup_deadline|event_start|event_end|event_result
+  timeRange     String?
+  location      String?
+  fee           String        @default("unknown")  // free|paid|unknown
+  signupMethod  String
+  sourceUrl     String
+  sourceName    String
+  sourceTier    Int           @default(4)          // 1 红头文件 … 4 自媒体/群转发
+  notes         String?
+  siblings      String        @default("[]")       // JSON：同系列分项，导入时折叠
+
+  // —— 打分（服务端按导入日复算，作「建议值」；人工可覆盖）——
+  suggestedBucket String      @default("C")
+  rScore        Float         @default(0)
+  tScore        Float         @default(0)
+  cScore        Float         @default(0)
+  suggestedTotal Float        @default(0)
+  bucket        String        @default("C")        // 人工最终档位（默认取建议值）
+  totalScore    Float         @default(0)
+  promoted      Boolean       @default(false)      // 主推保底提升标记（不外显）
+  scoreOverridden Boolean     @default(false)      // 人工改过档位
+
+  // —— 门槛校验（服务端强制，发布前复查）——
+  gatePassed    Boolean       @default(true)
+  gateCodes     String        @default("[]")       // JSON string[]：G0_FIELD_MISSING 等
+  complianceNote String       @default("")
+
+  // —— 发布态与软删除 ——
+  status        String        @default("draft")    // draft|published|archived|blocked
+  archiveReason String?
+  archivedAt    DateTime?
+  archivedBy    String?
+  sortOrder     Int           @default(0)
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status, bucket, keyDate])
+  @@index([editionId, status])
+  // 同一活动在**同一期次内**唯一（重复上传幂等）；跨期重复出现是正常的（赛程跨月），
+  // 各期独立留痕，保证回滚一批不会牵连上一期，也保证历史期次记录完整。
+  @@unique([editionId, externalId])
+}

@@ -2,6 +2,14 @@ node_modules/
 .next/
 out/
 *.log
-prisma/dev.db
 .env
 .env.local
+
+# 本地/生产 SQLite 数据库与部署前手动备份（含真实业务数据，绝不入库）
+prisma/dev.db
+prisma/dev.db-journal
+prisma/dev.db.bak-*
+prisma/*.db.bak-*
+
+# TypeScript 增量编译信息（每次 tsc/build 都会变，且因绝对路径而跨机器不同）
+*.tsbuildinfo

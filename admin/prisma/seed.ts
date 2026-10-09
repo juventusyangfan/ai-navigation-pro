@@ -118,6 +118,10 @@ async function main() {
       { resource: "literacy", action: "read" },
       { resource: "literacy", action: "write" },
       { resource: "literacy", action: "delete" },
+      // 赛事雷达：编辑可读可写可下架，但不能自审自发（发布动作需 write，编辑有）
+      { resource: "radar", action: "read" },
+      { resource: "radar", action: "write" },
+      { resource: "radar", action: "delete" },
       { resource: "media", action: "read" },
       { resource: "media", action: "write" },
       { resource: "users", action: "read" },
@@ -132,6 +136,8 @@ async function main() {
       { resource: "submissions", action: "read" },
       { resource: "submissions", action: "review" },
       { resource: "literacy", action: "read" },
+      // 赛事雷达：审核员只读。承接「审核权不能自审自发」——reviewer 不该拿到写权限
+      { resource: "radar", action: "read" },
       { resource: "users", action: "read" },
     ],
     school_admin: [
