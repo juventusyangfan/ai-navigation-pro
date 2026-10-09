@@ -333,8 +333,35 @@ function enterStep() {
 }
 
 function skipPrepare() {
+  // 跳过准备时间 = 立即进入作答：题目音频必须先停，否则会一路播到开麦，
+  // 被麦克风一并采进去当成「学生的朗读」送去评测。
+  stopQuestionAudio()
   clearInterval(prepareTimer)
   prepareLeft.value = 0
+}
+
+/**
+ * 停止题目音频（「播放录音」/「听示范朗读」）并复位按钮状态。
+ *
+ * ── 为什么每个「进入作答动作」的入口都必须调它（漏一处就出错）──────────────
+ * 1) **开麦前（最严重）**：题目音频走外放，而麦克风是同期开着的。若不停，
+ *    智聆会把「机器读的题干/范文」当成「学生朗读」评分 → 得分虚高，
+ *    且界面上完全看不出异常（学生只会以为自己读得好）。
+ *    这个错误不会报错、不会告警，只会静默污染每一次评测结果。
+ * 2) 跳过准备 / 试听自己的录音前：两路声音叠加，用户听不清自己的回放。
+ * 3) 切后台 / 离开页面：iOS 会挂起播放，回前台后按钮永久卡在「播放中…」。
+ *
+ * stopAll() 本身幂等（递增世代号并终结挂起的 Promise），可放心重复调用。
+ */
+function stopQuestionAudio() {
+  try {
+    stopAll()
+  } catch (e) {
+    /* ignore */
+  }
+  // 同步复位 playing，不依赖 play() 的 Promise 被 reject 后的微任务回调——
+  // 保证「点了跳过 / 开始录音」的同一帧里按钮就恢复可点，而不是慢一拍。
+  playing.value = false
 }
 
 async function playCurrent() {
@@ -367,6 +394,10 @@ function choose(i) {
 async function startRecord() {
   error.value = ''
   credError.value = ''
+  // [!] 开麦前必须停掉题目音频（原因见 stopQuestionAudio 注释 1）：
+  //   之所以放在发起点而不是等 startReadAloud 返回后再停——取密钥 + 建 WebSocket
+  //   要数百毫秒，这段时间麦克风已ready，音频仍在播就会被录音器整段采进去。
+  stopQuestionAudio()
   const item = current.value
   // 全口语题型统一走智聆 SDK 内置录音 + 评测（与 2026-09-18 调试记录参数一致：eval_mode=2 段落 / 16k_en）
   // ref_text 优先级：参考范文(refText) > 朗读/题干(passage) > 听力源文(audioText)
@@ -397,6 +428,8 @@ async function togglePlay(itemId) {
     resetPlayState()
     return
   }
+  // 试听自己的录音前先停掉题目音频，避免两路声音叠加（原因见 stopQuestionAudio 注释 2）
+  stopQuestionAudio()
   stopPlayback()
   resetPlayState()
   const rec = answers[itemId] && answers[itemId].rec
@@ -474,7 +507,7 @@ async function stopRecord() {
 
 function next() {
   clearTimers()
-  stopAll()
+  stopQuestionAudio()
   stopPlayback()
   resetPlayState()
   if (stepIndex.value === steps.value.length - 1) {
@@ -487,7 +520,7 @@ function next() {
 
 function prev() {
   clearTimers()
-  stopAll()
+  stopQuestionAudio()
   stopPlayback()
   resetPlayState()
   if (stepIndex.value > 0) stepIndex.value -= 1
@@ -524,19 +557,10 @@ function onFirstGesture() {
   document.removeEventListener('touchstart', onFirstGesture)
 }
 
-// 2) 切后台/离开页面：停止播放并复位 playing。否则 iOS 会挂起播放，
-//    回到前台时按钮永久卡在「播放中…」且再也点不动。
-function haltPlayback() {
-  try {
-    stopAll()
-  } catch (e) {
-    /* ignore */
-  }
-  playing.value = false
-}
-
+// 2) 切后台/离开页面：停止播放并复位 playing（原因见 stopQuestionAudio 注释 3）。
+//    否则 iOS 会挂起播放，回到前台时按钮永久卡在「播放中…」且再也点不动。
 function onVisibilityChange() {
-  if (document.hidden) haltPlayback()
+  if (document.hidden) stopQuestionAudio()
 }
 
 onMounted(() => {
@@ -547,16 +571,16 @@ onMounted(() => {
   document.addEventListener('pointerdown', onFirstGesture, { passive: true })
   document.addEventListener('touchstart', onFirstGesture, { passive: true })
   document.addEventListener('visibilitychange', onVisibilityChange)
-  window.addEventListener('pagehide', haltPlayback)
+  window.addEventListener('pagehide', stopQuestionAudio)
 })
 
 onUnmounted(() => {
   document.removeEventListener('pointerdown', onFirstGesture)
   document.removeEventListener('touchstart', onFirstGesture)
   document.removeEventListener('visibilitychange', onVisibilityChange)
-  window.removeEventListener('pagehide', haltPlayback)
+  window.removeEventListener('pagehide', stopQuestionAudio)
   clearTimers()
-  stopAll()
+  stopQuestionAudio()
   stopPlayback()
   if (ctrl) {
     try {
