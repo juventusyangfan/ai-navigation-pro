@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireAdmin, ok, fail } from "@/lib/http";
 import { toApiItem } from "@/lib/radar/serialize";
+import { guarded } from "@/lib/radar/route-guard";
 import { evaluateCandidate, todayIso, gateCodeLabel } from "@/lib/radar/gate";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,10 @@ export const dynamic = "force-dynamic";
  * 或对象不符的活动，会被直接判定为 blocked，无法进入发布态。
  */
 export async function GET(req: Request) {
+  return guarded("radar/events:list", () => handleList(req));
+}
+
+async function handleList(req: Request) {
   const guard = await requireAdmin("radar", "read");
   if (guard.error) return guard.error;
 
@@ -38,6 +43,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  return guarded("radar/events:create", () => handleCreate(req));
+}
+
+async function handleCreate(req: Request) {
   const guard = await requireAdmin("radar", "write");
   if (guard.error) return guard.error;
 

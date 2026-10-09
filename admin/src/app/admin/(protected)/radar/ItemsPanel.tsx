@@ -10,6 +10,20 @@ import {
   REGION_LABEL,
   ROLE_LABEL,
 } from "@/lib/radar/contract";
+import { readApi } from "@/lib/radar/api-client";
+
+/** 单条动作（update / publish / archive…）的响应 */
+interface PatchResp {
+  gateReasons?: string[];
+  statusChanged?: string | null;
+}
+
+/** 手工新增的响应（hint 服务端恒返回，故为必填） */
+interface CreateItemResp {
+  hint: string;
+  gatePassed: boolean;
+  gateReasons: string[];
+}
 
 interface Edition {
   id: string;
@@ -97,15 +111,19 @@ export default function ItemsPanel({ refreshKey, onDone }: { refreshKey: number;
   const [busy, setBusy] = useState(false);
 
   const loadEditions = useCallback(async () => {
-    const res = await fetch("/api/admin/radar/editions");
-    if (!res.ok) return;
-    const list = (await res.json()) as Edition[];
-    setEditions(list);
-    setEditionId((cur) => {
-      if (cur && list.some((e) => e.id === cur)) return cur;
-      const draftOne = list.find((e) => e.status === "draft");
-      return (draftOne ?? list[0])?.id ?? "";
-    });
+    try {
+      const res = await fetch("/api/admin/radar/editions");
+      const list = await readApi<Edition[]>(res);
+      setEditions(list);
+      setEditionId((cur) => {
+        if (cur && list.some((e) => e.id === cur)) return cur;
+        const draftOne = list.find((e) => e.status === "draft");
+        return (draftOne ?? list[0])?.id ?? "";
+      });
+      setErr("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "加载期次失败");
+    }
   }, []);
 
   const loadItems = useCallback(async (id: string) => {
@@ -116,8 +134,7 @@ export default function ItemsPanel({ refreshKey, onDone }: { refreshKey: number;
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/radar/events?editionId=${encodeURIComponent(id)}`);
-      if (!res.ok) throw new Error("加载条目失败");
-      setItems((await res.json()) as EventItem[]);
+      setItems(await readApi<EventItem[]>(res));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "加载失败");
     } finally {
@@ -145,8 +162,7 @@ export default function ItemsPanel({ refreshKey, onDone }: { refreshKey: number;
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "操作失败");
+      const data = await readApi<PatchResp>(res);
       if (data.gateReasons?.length) {
         setErr(`门槛未通过：${data.gateReasons.join("；")}${data.statusChanged ? `（状态 ${data.statusChanged}）` : ""}`);
       } else if (data.statusChanged) {
@@ -180,8 +196,7 @@ export default function ItemsPanel({ refreshKey, onDone }: { refreshKey: number;
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ editionId, ...draft }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "新增失败");
+      const data = await readApi<CreateItemResp>(res);
       setMsg(data.hint);
       if (!data.gatePassed && data.gateReasons?.length) {
         setErr(`该条未通过硬门槛：${data.gateReasons.join("；")}`);

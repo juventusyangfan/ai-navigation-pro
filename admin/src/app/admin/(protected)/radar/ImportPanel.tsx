@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { readApi } from "@/lib/radar/api-client";
 
 interface Sibling {
   name: string;
@@ -115,9 +116,7 @@ export default function ImportPanel({ onDone }: { onDone: () => void }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "preview", text, fileName }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "解析失败");
-      const p = data as PreviewResp;
+      const p = await readApi<PreviewResp>(res);
       setPreview(p);
       setSelected(new Set(p.items.filter((r) => r.gatePassed).map((r) => r.externalId)));
     } catch (e) {
@@ -138,9 +137,8 @@ export default function ImportPanel({ onDone }: { onDone: () => void }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "commit", text, fileName, selected: [...selected] }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "入库失败");
-      setCommitted(data as CommitResp);
+      const data = await readApi<CommitResp>(res);
+      setCommitted(data);
       setPreview(null);
       setText("");
       setFileName("");

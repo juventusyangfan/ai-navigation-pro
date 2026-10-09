@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireAdmin, ok, fail } from "@/lib/http";
 import { editionTitle, parseCandidatePayload } from "@/lib/radar/parse";
+import { guarded } from "@/lib/radar/route-guard";
 import { applyPromotion, evaluateCandidate, todayIso, type EvaluatedCandidate } from "@/lib/radar/gate";
 import { toDbData } from "@/lib/radar/serialize";
 import {
@@ -25,6 +26,12 @@ export const dynamic = "force-dynamic";
  * 避免「既当运动员又当裁判」。
  */
 export async function POST(req: Request) {
+  // 必须走 guarded：本处理器会碰数据库，任何未捕获异常在生产环境都会变成
+  // 「500 + 空 body」，前端只能看到「Unexpected end of JSON input」（详见 route-guard.ts）
+  return guarded("radar/import", () => handleImport(req));
+}
+
+async function handleImport(req: Request) {
   const guard = await requireAdmin("radar", "write");
   if (guard.error) return guard.error;
 
