@@ -83,6 +83,16 @@
   .card .tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
   .tag{font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid #e2e8fb;color:#4a5a8a;background:#f2f5ff}
   .tag.hot{color:#fff;background:var(--grad);border-color:transparent;box-shadow:0 2px 8px rgba(97,77,255,.32)}
+  .tag.wlc{color:#6b7280;background:#f4f6f8;border-color:#dfe3e8;border-style:dashed}
+  /* 白名单醒目徽章：实心绿底白字 + 盾牌，摆在标签行首位，一眼可见 */
+  .wlbadge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px 4px 9px;border-radius:999px;
+    font-size:12.5px;font-weight:700;letter-spacing:.2px;line-height:1.35;color:#fff;
+    background:linear-gradient(135deg,#14ad6d 0%,#0a7a49 100%);border:1px solid rgba(255,255,255,.3);
+    box-shadow:0 2px 8px rgba(10,122,73,.32)}
+  .wlbadge svg{flex:0 0 auto;opacity:.95}
+  .nmchip{display:inline-flex;align-items:center;gap:3px;margin-left:6px;font-size:10.5px;padding:1px 6px;border-radius:4px;background:#eef8e4;color:#2f6b12;white-space:nowrap;vertical-align:middle}
+  .nmchip.hit{background:linear-gradient(135deg,#14ad6d,#0a7a49);color:#fff;font-weight:700;box-shadow:0 1px 5px rgba(10,122,73,.28)}
+  .nmchip.n{background:#f4f6f8;color:#6b7280;border:1px dashed #dfe3e8}
   .row{display:flex;gap:8px;font-size:13.5px;padding:5px 0;border-top:1px dashed #eef1f8}
   .row:first-of-type{border-top:0}
   .row .k{flex:0 0 62px;color:var(--muted);font-size:12.5px}
@@ -149,7 +159,7 @@
 
   <footer class="ft">
     信息来源为公开渠道，本平台仅作信息告知，<b>不组织报名、不代收作品、不开展赛事培训、不承诺获奖结果</b>，亦不与升学、评优关联表述。<br>
-    <span class="disc">具体赛制与报名要求请以主办方官方通知为准。</span>
+    <span class="disc">「竞赛白名单」指列入教育部《2025—2028学年面向中小学生的全国性竞赛活动名单》的竞赛，名单内活动在排序中权重略高。该名单只约束全国性竞赛，未列入不等于活动存在问题，不构成对任何活动或主办方的推荐与评价。具体赛制与报名要求请以主办方官方通知为准。</span>
   </footer>
 </div>
 
@@ -200,16 +210,63 @@
     return "已过期";
   }
 
+  // 白名单标记。只有 confirmed / not_listed 显示——非竞赛类活动本就不受
+  // 竞赛名单约束，未判定则无信息量，标出来只会让人误以为「没标的都有问题」。
+  // 盾牌而非奖杯/金牌：白名单是「经审核在册」的语义，用奖杯会被读成「获奖」或
+  // 「推荐」，而合规红线明确要求白名单不得表述为推荐。
+  var WL_SHIELD = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" aria-hidden="true">' +
+    '<path d="M8 1.2l5.4 2v4.5c0 3.3-2.2 6.2-5.4 7.5-3.2-1.3-5.4-4.2-5.4-7.5V3.2l5.4-2z" fill="currentColor" opacity=".32"/>' +
+    '<path d="M7.1 10.8L4.5 8.2l1.1-1.1 1.5 1.5 3.2-3.2 1.1 1.1-4.3 4.3z" fill="currentColor"/></svg>';
+
+  function wlTag(it) {
+    var wl = it.whitelist || {};
+    if (wl.status === "confirmed") {
+      var label = "教育部竞赛白名单" + (wl.matchedSeq ? " · 第 " + wl.matchedSeq + " 项" : "");
+      return '<span class="wlbadge" title="' + esc(wl.basis || "") + '">' + WL_SHIELD + esc(label) + '</span>';
+    }
+    if (wl.status === "not_listed") {
+      return '<span class="tag wlc" title="' + esc(wl.basis || "") + '">非名单内竞赛</span>';
+    }
+    return "";
+  }
+
+  function wlChip(it) {
+    var wl = it.whitelist || {};
+    if (wl.status === "confirmed") {
+      return '<span class="nmchip hit" title="' + esc(wl.basis || "") + '">' + WL_SHIELD + '名单内' +
+        (wl.matchedSeq ? " 第 " + wl.matchedSeq + " 项" : "") + '</span>';
+    }
+    if (wl.status === "not_listed") {
+      return '<span class="nmchip n" title="' + esc(wl.basis || "") + '">非名单内</span>';
+    }
+    return "";
+  }
+
+  function wlRow(it) {
+    var wl = it.whitelist || {};
+    if (wl.status === "confirmed") {
+      return esc(wl.matchedName || "") + (wl.matchedSeq ? "（名单第 " + wl.matchedSeq + " 项）" : "");
+    }
+    if (wl.status === "not_listed") {
+      return '非名单内竞赛 <span style="color:#8a92a8">（该名单只约束全国性竞赛，不构成对活动本身的评价）</span>';
+    }
+    return "";
+  }
+
   function mainCard(it) {
     var tags = ['<span class="tag hot">' + esc(it.categoryLabel) + '</span>'];
     if (it.gradeLabel) tags.push('<span class="tag">' + esc(it.gradeLabel) + '</span>');
     if (it.roleLabel) tags.push('<span class="tag">' + esc(it.roleLabel) + '</span>');
     if (it.regionLabel) tags.push('<span class="tag">' + esc(it.regionLabel) + '</span>');
+    // 白名单徽章放首位：这是整张卡片最需要被一眼看到的信息
+    var wlT = wlTag(it);
+    if (wlT) tags.unshift(wlT);
 
     var body = rows([
       { k: "主办方", v: esc(it.organizer) },
       it.coOrganizer ? { k: "承办", v: esc(it.coOrganizer) } : null,
       { k: "参赛对象", v: esc(it.audienceRaw) },
+      wlRow(it) ? { k: "竞赛名单", v: wlRow(it) } : null,
       { k: it.keyDateTypeLabel, v: esc(it.keyDate) + (dayText(it.daysToKeyDate) ? ' <span class="tag">' + dayText(it.daysToKeyDate) + '</span>' : "") },
       it.timeRange ? { k: "活动时间", v: esc(it.timeRange) } : null,
       it.location ? { k: "地点", v: esc(it.location) } : null,
@@ -240,7 +297,7 @@
   function altTable(list) {
     return '<table class="tb"><thead><tr><th>活动</th><th>参赛对象</th><th style="width:96px">关键节点</th></tr></thead><tbody>' +
       list.map(function (it) {
-        return '<tr><td><div class="nm">' + esc(it.name) + '</div><div class="org">' + esc(it.organizer) + '</div></td>' +
+        return '<tr><td><div class="nm">' + esc(it.name) + wlChip(it) + '</div><div class="org">' + esc(it.organizer) + '</div></td>' +
           '<td>' + esc(it.gradeLabel) + '<div class="org">' + esc(it.roleLabel) + '</div></td>' +
           '<td>' + esc(it.keyDateTypeLabel) + '<div class="org">' + esc(it.keyDate) + '</div></td></tr>';
       }).join("") + '</tbody></table>';

@@ -4,6 +4,8 @@ import { toApiItem } from "@/lib/radar/serialize";
 import { guarded } from "@/lib/radar/route-guard";
 import type { RadarEvent } from "@prisma/client";
 import { evaluateCandidate, gateCodeLabel, recheckPublishable, todayIso } from "@/lib/radar/gate";
+import { WHITELIST_STATUSES } from "@/lib/radar/contract";
+import { resolveWhitelist } from "@/lib/radar/whitelist";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,9 @@ function rowToRaw(e: RadarEvent): Record<string, unknown> {
     source_tier: e.sourceTier,
     notes: e.notes,
     siblings: parse<unknown[]>(e.siblings, []),
+    // 活动类型是白名单判定的输入之一。只落库显式声明的值，
+    // 推断结果不落库——否则下次读取会把「据名称推断」误当成「上游标注」。
+    activity_type: e.activityType ?? undefined,
   };
 }
 
@@ -133,6 +138,52 @@ async function handlePatch(req: Request, { params }: Ctx) {
     return ok(toApiItem(updated, today));
   }
 
+  /**
+   * 人工修正白名单判定。
+   *
+   * 内置名单只覆盖教育部的全国名单，省级备案名单等本地情形判不出来时，
+   * 需要人工兜底。这是**留痕**操作：置 whitelistManual 后，后续编辑不再
+   * 自动重算覆盖它（否则人工刚改完就被下次保存冲掉）。
+   */
+  if (action === "setWhitelist") {
+    // 恢复自动：清掉人工标记，按内置名单重新判定
+    if (b.auto === true) {
+      const w = resolveWhitelist(rowToRaw(e));
+      const updated = await db.radarEvent.update({
+        where: { id },
+        data: {
+          whitelistStatus: w.status,
+          whitelistScope: w.scope,
+          whitelistMatched: w.matchedName,
+          whitelistSeq: w.matchedSeq,
+          whitelistBasis: w.basis,
+          whitelistManual: false,
+        },
+      });
+      return ok(toApiItem(updated, today));
+    }
+
+    const status = String(b.whitelistStatus ?? "");
+    if (!(WHITELIST_STATUSES as readonly string[]).includes(status)) {
+      return fail(400, `白名单状态只能是 ${WHITELIST_STATUSES.join(" / ")}`);
+    }
+    const matched = String(b.matchedName ?? "").trim();
+    const seqRaw = Number(b.matchedSeq);
+    const basis = String(b.whitelistBasis ?? "").trim();
+    const updated = await db.radarEvent.update({
+      where: { id },
+      data: {
+        whitelistStatus: status,
+        whitelistScope: status === "confirmed" ? String(b.whitelistScope ?? "national") : null,
+        whitelistMatched: matched || null,
+        whitelistSeq: Number.isFinite(seqRaw) && seqRaw > 0 ? Math.trunc(seqRaw) : null,
+        whitelistBasis: basis || "人工判定（未附依据）",
+        whitelistManual: true,
+      },
+    });
+    return ok(toApiItem(updated, today));
+  }
+
   // update：编辑字段并重跑门槛
   const raw = rowToRaw(e);
   const map: [string, string][] = [
@@ -199,6 +250,13 @@ async function handlePatch(req: Request, { params }: Ctx) {
       gatePassed: c.gatePassed,
       gateCodes: JSON.stringify(c.gateCodes),
       complianceNote: c.complianceNote,
+      // 人工改过白名单判定的条目不再自动覆盖——否则人工刚改完就被下次保存冲掉
+      activityType: e.whitelistManual ? e.activityType : c.whitelist.declaredKind,
+      whitelistStatus: e.whitelistManual ? e.whitelistStatus : c.whitelist.status,
+      whitelistScope: e.whitelistManual ? e.whitelistScope : c.whitelist.scope,
+      whitelistMatched: e.whitelistManual ? e.whitelistMatched : c.whitelist.matchedName,
+      whitelistSeq: e.whitelistManual ? e.whitelistSeq : c.whitelist.matchedSeq,
+      whitelistBasis: e.whitelistManual ? e.whitelistBasis : c.whitelist.basis,
       status,
     },
   });
