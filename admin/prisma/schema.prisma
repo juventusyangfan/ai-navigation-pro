@@ -433,6 +433,17 @@ model RadarEvent {
   gateCodes     String        @default("[]")       // JSON string[]：G0_FIELD_MISSING 等
   complianceNote String       @default("")
 
+  // —— 白名单标注（信息字段，不参与门槛与打分）——
+  // 服务端按内置名单重算，人工可修正（如省级备案名单未内置时）；
+  // 判定规则与红线见 src/lib/radar/whitelist.ts
+  activityType     String?                         // competition|non_competition，仅上游显式声明时落库
+  whitelistStatus  String  @default("unknown")     // confirmed|not_listed|not_applicable|unknown
+  whitelistScope   String?                         // national|provincial
+  whitelistMatched String?                         // 命中的名单条目全称
+  whitelistSeq     Int?                            // 名单序号
+  whitelistBasis   String?                         // 判定依据（可核验，含匹配方式）
+  whitelistManual  Boolean @default(false)         // 人工改过判定（留痕，与 scoreOverridden 同范式）
+
   // —— 发布态与软删除 ——
   status        String        @default("draft")    // draft|published|archived|blocked
   archiveReason String?

@@ -6,11 +6,12 @@
  * 一条培训机构自办、收费、无官方红头的活动就能被手工录进去、直接发到服务号。
  *
  * 与 radar.py 的对应关系（改动必须两侧同步）：
- *   norm_key / make_id   → normKey / makeId
+ *   norm_key / make_id   → normKey（在 contract.ts）/ makeId
  *   parse_date           → parseDate
  *   t_score / c_score    → tScore / cScore
  *   evaluate()           → evaluateCandidate()
  *   merge 保底           → applyPromotion()
+ *   resolve_whitelist()  → resolveWhitelist()（在 whitelist.ts）
  * 新增 G5（话术红线）为服务端独有门槛，技能侧无此检查。
  */
 import { createHash } from "node:crypto";
@@ -22,6 +23,7 @@ import {
   GRADE_LABEL,
   KEYDATE_LABEL,
   MAX_SOURCE_TIER,
+  normKey,
   PROMOTE_FLOOR,
   PROMOTE_MIN_COUNT,
   REGIONS,
@@ -29,8 +31,10 @@ import {
   ROLE_LABEL,
   SCAN_FIELDS,
   scanText,
+  WHITELIST_C_BONUS,
   type Bucket,
 } from "./contract";
+import { resolveWhitelist, type WhitelistVerdict } from "./whitelist";
 
 /* ----------------------------- 基础工具 ----------------------------- */
 
@@ -40,16 +44,8 @@ export function todayIso(offsetHours = 8): string {
   return shifted.toISOString().slice(0, 10);
 }
 
-/** 归一化活动名（跨来源去重的键）。等价于 radar.py 的 norm_key。 */
-export function normKey(name: string): string {
-  let s = String(name ?? "")
-    .normalize("NFKC")
-    .toLowerCase();
-  s = s.replace(/[\s\-—_·、，,。.：:；;（）()【】[\]《》<>"'“”‘’/\\|]+/g, "");
-  s = s.replace(/(20\d{2})-?(20\d{2})?/g, "");
-  s = s.replace(/第[一二三四五六七八九十\d]+届/g, "");
-  return s;
-}
+/** 归一化活动名（跨来源去重的键）。实现已上移到 contract.ts，供 whitelist.ts 共用。 */
+export { normKey };
 
 /** 活动稳定去重键：normKey 的 SHA1 前 12 位。等价于 radar.py 的 make_id。 */
 export function makeId(name: string): string {
@@ -148,7 +144,12 @@ export interface EvaluatedCandidate {
 
   rScore: number;
   tScore: number;
+  /** 可信度实际得分（已含白名单加分，上限 5.0） */
   cScore: number;
+  /** 加分前的可信度基数，用于解释「为什么分高」 */
+  cScoreBase: number;
+  /** 实际生效的白名单加分（C 分原本已满 5.0 时为 0） */
+  whitelistBonus: number;
   suggestedTotal: number;
   suggestedBucket: Bucket;
   promoted: boolean;
@@ -157,6 +158,8 @@ export interface EvaluatedCandidate {
   gateCodes: string[];
   warnings: string[];
   complianceNote: string;
+  /** 白名单判定：不是门槛，但会影响 cScore */
+  whitelist: WhitelistVerdict;
 }
 
 /* ---------------------------- 门槛校验 ---------------------------- */
@@ -169,9 +172,10 @@ function strArray(v: unknown): string[] {
 }
 
 /** 复刻 radar.py 的 build_compliance_note */
-export function buildComplianceNote(fee: string, tier: number, keyDateType: string): string {
+export function buildComplianceNote(fee: string, tier: number, keyDateType: string, whitelistStatus = "unknown"): string {
   const notes: string[] = [];
-  if (fee !== "free" || tier > MAX_SOURCE_TIER) {
+  // 只有「免费 + 名单内竞赛」才不必附加「不参与组织」的免责——其余一律附加
+  if (fee !== "free" || tier > MAX_SOURCE_TIER || whitelistStatus !== "confirmed") {
     notes.push("仅作信息告知，本平台不参与组织、不引导报名");
   }
   if (keyDateType === "signup_start" || keyDateType === "signup_deadline") {
@@ -238,7 +242,16 @@ export function evaluateCandidate(raw: RawCandidate, today: string): EvaluatedCa
   const category = str(raw.category).toLowerCase() || "general";
   const r = CATEGORY_SCORE[category] ?? 1;
   const t = tScore(days);
-  const c = cScore(sourceTier, raw.c_score);
+
+  // 白名单判定必须先于 C 分：判为名单内的竞赛在可信度维度上调分（与 radar.py 同步）
+  const whitelist = resolveWhitelist(raw);
+  // 覆盖值优先取 c_score_base：技能产出（output/*.json）里的 c_score 已含白名单加分，
+  // 直接拿来当 override 会二次加分（多数被 5.0 上限挡住，但 tier 低 + 已核验的边界会算出不同结果）。
+  // 原始候选（raw/*.json）没有 c_score_base，退回 c_score，语义不变。
+  const cScoreBase = cScore(sourceTier, raw.c_score_base ?? raw.c_score);
+  const cRaw = whitelist.status === "confirmed" ? cScoreBase + WHITELIST_C_BONUS : cScoreBase;
+  const c = Math.round(Math.min(5, cRaw) * 100) / 100;
+  const whitelistBonus = Math.round((c - cScoreBase) * 100) / 100;
   const total = totalScore(r, t, c);
 
   const keyDateType = str(raw.key_date_type);
@@ -274,6 +287,8 @@ export function evaluateCandidate(raw: RawCandidate, today: string): EvaluatedCa
     rScore: r,
     tScore: t,
     cScore: c,
+    cScoreBase,
+    whitelistBonus,
     suggestedTotal: total,
     suggestedBucket: bucketOf(total),
     promoted: false,
@@ -281,7 +296,8 @@ export function evaluateCandidate(raw: RawCandidate, today: string): EvaluatedCa
     gatePassed: codes.length === 0,
     gateCodes: codes,
     warnings,
-    complianceNote: buildComplianceNote(fee, sourceTier, keyDateType),
+    complianceNote: buildComplianceNote(fee, sourceTier, keyDateType, whitelist.status),
+    whitelist,
   };
 }
 

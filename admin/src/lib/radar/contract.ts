@@ -9,10 +9,29 @@
  */
 
 /** 技能产出 JSON 的契约版本。不匹配时导入直接拒绝，避免静默错解。 */
-export const CANDIDATE_SCHEMA_VERSION = "1.0";
+export const CANDIDATE_SCHEMA_VERSION = "1.2";
 
 /** 兼容的最低版本（同主版本号即可） */
 export const MIN_SCHEMA_VERSION_MAJOR = 1;
+
+/* ----------------------------- 基础工具 ----------------------------- */
+
+/**
+ * 归一化活动名（跨来源去重的键，也是白名单匹配的键）。
+ * 等价于 radar.py 的 norm_key——三处（技能、gate、whitelist）必须同口径。
+ *
+ * 放在契约层而非 gate.ts：whitelist.ts 也要用它匹配名单，
+ * 若各自实现一份，将来改规则必然漏改一处。
+ */
+export function normKey(name: string): string {
+  let s = String(name ?? "")
+    .normalize("NFKC")
+    .toLowerCase();
+  s = s.replace(/[\s\-—_·、，,。.：:；;（）()【】[\]《》<>"'“”‘’/\\|]+/g, "");
+  s = s.replace(/(20\d{2})-?(20\d{2})?/g, "");
+  s = s.replace(/第[一二三四五六七八九十\d]+届/g, "");
+  return s;
+}
 
 /* ------------------------------- 枚举 ------------------------------- */
 
@@ -92,6 +111,42 @@ export const BUCKET_LABEL: Record<string, string> = {
 
 /** 信源层级上限：>3 的一律不得进入发布态 */
 export const MAX_SOURCE_TIER = 3;
+
+/* --------------------------- 白名单状态枚举 --------------------------- */
+
+/**
+ * 白名单判定四态。判定规则与合规红线见 `whitelist.ts`。
+ * 这不是门槛——判为哪一态都不影响能否发布（不参与 G 层校验）。
+ * 但**参与打分**：判为 confirmed 时在可信度（C）维度上调 WHITELIST_C_BONUS 分。
+ */
+export const WHITELIST_STATUSES = ["confirmed", "not_listed", "not_applicable", "unknown"] as const;
+export type WhitelistStatus = (typeof WHITELIST_STATUSES)[number];
+export const WHITELIST_STATUS_LABEL: Record<string, string> = {
+  confirmed: "在现行全国竞赛名单内",
+  not_listed: "非名单内竞赛",
+  not_applicable: "非竞赛类活动（名单制度不适用）",
+  unknown: "未判定",
+};
+/**
+ * 前台只对这两种状态显示标记。
+ * 非竞赛类活动本就不受竞赛名单约束、未判定则无信息量——标出来只会制造噪音，
+ * 还会让读者误以为「没标的都有问题」。
+ */
+export const WHITELIST_VISIBLE_STATUSES = ["confirmed", "not_listed"] as const;
+
+/**
+ * 白名单加分：仅在可信度（C）维度上调，C 分上限 5.0。
+ *
+ * 落点刻意不选「总分另加一项」：白名单的本质是主办方经教育部审核，属可信度
+ * 证据，与 C 分（信源层级）同源；直接加总分等于人为下移 4.0/3.0 分档线，
+ * 会破坏 R×0.40 + T×0.35 + C×0.25 的权重结构。
+ *
+ * **只加不减**：判为 not_listed 不扣分——名单只约束全国性竞赛，武汉本地
+ * 赛事与区级选拔不在名单内但完全合法，扣分会系统性把它们挤出主推区。
+ *
+ * ⚠️ 与 `radar.py` 的 `WHITELIST_C_BONUS` 必须一致，改动两侧同步。
+ */
+export const WHITELIST_C_BONUS = 2.0;
 
 /** 主推区保底条数与保底分 */
 export const PROMOTE_MIN_COUNT = 2;
