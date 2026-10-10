@@ -16,7 +16,10 @@ import {
   KEYDATE_LABEL,
   REGION_LABEL,
   ROLE_LABEL,
+  WHITELIST_STATUS_LABEL,
+  WHITELIST_VISIBLE_STATUSES,
 } from "./contract";
+import { WHITELIST_ENTRIES } from "./whitelist";
 import { daysBetween, todayIso, type EvaluatedCandidate, type SiblingRef } from "./gate";
 
 const arr = <T>(s: string | null | undefined): T[] => {
@@ -69,9 +72,54 @@ export function toDbData(c: EvaluatedCandidate, editionId: string, sortOrder: nu
     gateCodes: JSON.stringify(c.gateCodes),
     complianceNote: c.complianceNote,
 
+    // 白名单判定随条目落库：前台要展示、后台可复核，且被判错的记录要能回看
+    activityType: c.whitelist.declaredKind,
+    whitelistStatus: c.whitelist.status,
+    whitelistScope: c.whitelist.scope,
+    whitelistMatched: c.whitelist.matchedName,
+    whitelistSeq: c.whitelist.matchedSeq,
+    whitelistBasis: c.whitelist.basis,
+
     // 被门槛拦截的条目落 blocked，确保「拦了什么」可回溯
     status: c.gatePassed ? ("draft" as const) : ("blocked" as const),
     sortOrder,
+  };
+}
+
+/* ------------------------------- 白名单 ------------------------------- */
+
+export interface ApiWhitelist {
+  status: string;
+  statusLabel: string;
+  scope?: string;
+  /** 命中的名单条目全称 */
+  matchedName?: string;
+  /** 名单序号 */
+  matchedSeq?: number;
+  /** 名单分组（由序号反查，未落库） */
+  group?: string;
+  /** 判定依据，可核验 */
+  basis: string;
+  /** 人工改过判定 */
+  manual: boolean;
+  /** 是否建议前台显示标记 */
+  visible: boolean;
+}
+
+/** Prisma 行 → 白名单展示形状。后台与前台共用，避免两处口径漂移。 */
+export function toApiWhitelist(e: RadarEvent): ApiWhitelist {
+  const status = e.whitelistStatus || "unknown";
+  const group = e.whitelistSeq != null ? WHITELIST_ENTRIES.find((x) => x.seq === e.whitelistSeq)?.group : undefined;
+  return {
+    status,
+    statusLabel: WHITELIST_STATUS_LABEL[status] ?? status,
+    scope: e.whitelistScope ?? undefined,
+    matchedName: e.whitelistMatched ?? undefined,
+    matchedSeq: e.whitelistSeq ?? undefined,
+    group,
+    basis: e.whitelistBasis ?? "",
+    manual: e.whitelistManual,
+    visible: (WHITELIST_VISIBLE_STATUSES as readonly string[]).includes(status),
   };
 }
 
@@ -115,6 +163,7 @@ export interface RadarEventApi {
   notes?: string;
   siblings: ApiSibling[];
   complianceNote: string;
+  whitelist: ApiWhitelist;
 
   bucket: string;
   bucketLabel: string;
@@ -170,6 +219,7 @@ export function toApiItem(e: RadarEvent, today = todayIso()): RadarEventApi {
     notes: e.notes ?? undefined,
     siblings: arr<SiblingRef>(e.siblings),
     complianceNote: e.complianceNote,
+    whitelist: toApiWhitelist(e),
 
     bucket: e.bucket,
     bucketLabel: BUCKET_LABEL[e.bucket] ?? e.bucket,
@@ -261,6 +311,7 @@ export interface PublicRadarItem {
   notes?: string;
   siblings: ApiSibling[];
   complianceNote: string;
+  whitelist: ApiWhitelist;
   bucket: string;
 }
 
@@ -293,6 +344,7 @@ export function toPublicItem(e: RadarEvent, today = todayIso()): PublicRadarItem
     notes: e.notes ?? undefined,
     siblings: arr<SiblingRef>(e.siblings),
     complianceNote: e.complianceNote,
+    whitelist: toApiWhitelist(e),
     bucket: e.bucket,
   };
 }

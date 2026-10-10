@@ -46,6 +46,14 @@ interface PreviewRow {
   gateCodes: string[];
   warnings: string[];
   complianceNote: string;
+  whitelist: {
+    status: string;
+    statusLabel: string;
+    matchedName: string | null;
+    matchedSeq: number | null;
+    basis: string;
+    visible: boolean;
+  };
 }
 
 interface PreviewResp {
@@ -291,6 +299,18 @@ export default function ImportPanel({ onDone }: { onDone: () => void }) {
                     <td>
                       <div style={{ fontWeight: 600 }}>{r.name}</div>
                       <div style={{ color: "var(--muted)", fontSize: 12 }}>{r.organizer}</div>
+                      {r.whitelist?.visible && (
+                        <div style={{ marginTop: 3 }}>
+                          <span
+                            className={`badge ${r.whitelist.status === "confirmed" ? "ok" : "warn"}`}
+                            title={r.whitelist.basis}
+                          >
+                            {r.whitelist.status === "confirmed"
+                              ? `白名单 · 第 ${r.whitelist.matchedSeq ?? "?"} 项`
+                              : "非名单内竞赛"}
+                          </span>
+                        </div>
+                      )}
                       {r.siblings.length > 0 && (
                         <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>
                           同系列：{r.siblings.map((s) => s.name).join("；")}

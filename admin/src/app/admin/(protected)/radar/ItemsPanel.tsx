@@ -9,6 +9,7 @@ import {
   KEYDATE_LABEL,
   REGION_LABEL,
   ROLE_LABEL,
+  WHITELIST_STATUS_LABEL,
 } from "@/lib/radar/contract";
 import { readApi } from "@/lib/radar/api-client";
 
@@ -31,6 +32,19 @@ interface Edition {
   runDate: string;
   status: string;
   counts: { A: number; B: number; C: number; blocked: number; archived: number };
+}
+
+/** 白名单判定（信息标注，不参与门槛与打分） */
+interface WhitelistInfo {
+  status: string;
+  statusLabel: string;
+  scope?: string;
+  matchedName?: string;
+  matchedSeq?: number;
+  group?: string;
+  basis: string;
+  manual: boolean;
+  visible: boolean;
 }
 
 interface EventItem {
@@ -74,6 +88,7 @@ interface EventItem {
   gateCodes: string[];
   status: string;
   archiveReason?: string;
+  whitelist: WhitelistInfo;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -296,6 +311,23 @@ export default function ItemsPanel({ refreshKey, onDone }: { refreshKey: number;
                   <td>
                     <div style={{ fontWeight: 600 }}>{it.name}</div>
                     <div style={{ color: "var(--muted)", fontSize: 12 }}>{it.organizer}</div>
+                    {it.whitelist?.visible && (
+                      <div style={{ marginTop: 3 }}>
+                        <span
+                          className={`badge ${it.whitelist.status === "confirmed" ? "ok" : "warn"}`}
+                          title={it.whitelist.basis}
+                        >
+                          {it.whitelist.status === "confirmed"
+                            ? `白名单 · 第 ${it.whitelist.matchedSeq ?? "?"} 项`
+                            : "非名单内竞赛"}
+                        </span>
+                        {it.whitelist.manual && (
+                          <span className="badge draft" style={{ marginLeft: 4 }} title="人工判定">
+                            人工
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {!it.gatePassed && (
                       <div style={{ color: "var(--danger)", fontSize: 12, marginTop: 2 }}>
                         {it.gateCodes.join("；")}
@@ -377,6 +409,11 @@ export default function ItemsPanel({ refreshKey, onDone }: { refreshKey: number;
                 {editingId === it.id && (
                   <tr key={`${it.id}-edit`}>
                     <td colSpan={6} style={{ background: "#fafafa" }}>
+                      <WhitelistRow
+                        item={it}
+                        busy={busy}
+                        onSet={(payload) => patch(it.id, { action: "setWhitelist", ...payload })}
+                      />
                       <ItemForm value={draft} onChange={setDraft} />
                       <div className="row-actions">
                         <button className="btn primary" onClick={() => saveEdit(it.id)} disabled={busy}>
@@ -400,6 +437,77 @@ export default function ItemsPanel({ refreshKey, onDone }: { refreshKey: number;
           </tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+/**
+ * 白名单判定的展示与人工修正。
+ *
+ * 内置名单只覆盖教育部的全国名单——省级备案名单等本地情形判不出来时，
+ * 需要人工兜底。人工判定一经设置即留痕（whitelistManual），后续编辑不再
+ * 自动覆盖，否则人工刚改完就会被下次保存冲掉。
+ */
+function WhitelistRow({
+  item,
+  busy,
+  onSet,
+}: {
+  item: EventItem;
+  busy: boolean;
+  onSet: (payload: Record<string, unknown>) => void;
+}) {
+  const wl = item.whitelist;
+  const tone = wl.status === "confirmed" ? "ok" : wl.status === "not_listed" ? "warn" : "draft";
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 12, marginBottom: 12 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+        白名单判定
+        <span style={{ fontWeight: 400, color: "var(--muted)", fontSize: 12, marginLeft: 8 }}>
+          不是门槛，但参与打分：判为名单内时可信度 C 分 +2.0（总分约 +0.5）
+        </span>
+      </div>
+      <div style={{ fontSize: 13, marginBottom: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span className={`badge ${tone}`}>{wl.statusLabel}</span>
+        {wl.matchedName && (
+          <span>
+            {wl.matchedName}
+            {wl.matchedSeq ? `（名单第 ${wl.matchedSeq} 项）` : ""}
+          </span>
+        )}
+        {wl.manual && <span className="badge draft">人工判定</span>}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
+        依据：{wl.basis || "—"}
+      </div>
+      <div className="row-actions">
+        <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+          人工修正
+          <span style={{ color: "#b45309" }}>（只改标注，不重算分数）</span>
+        </span>
+        <select
+          className="btn sm"
+          style={{ padding: "4px 6px" }}
+          value={wl.manual ? wl.status : ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v) onSet({ whitelistStatus: v, whitelistBasis: `人工判定：${WHITELIST_STATUS_LABEL[v] ?? v}` });
+          }}
+          disabled={busy}
+        >
+          <option value="">（按名单自动判定）</option>
+          {Object.entries(WHITELIST_STATUS_LABEL).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
+        </select>
+        {wl.manual && (
+          <button className="btn sm" onClick={() => onSet({ auto: true })} disabled={busy}>
+            恢复自动判定
+          </button>
+        )}
+      </div>
     </div>
   );
 }

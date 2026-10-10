@@ -11,6 +11,8 @@ import {
   KEYDATE_LABEL,
   REGION_LABEL,
   ROLE_LABEL,
+  WHITELIST_STATUS_LABEL,
+  WHITELIST_VISIBLE_STATUSES,
 } from "@/lib/radar/contract";
 
 export const dynamic = "force-dynamic";
@@ -208,5 +210,13 @@ function toPreviewRow(c: EvaluatedCandidate) {
     gateCodes: c.gateCodes,
     warnings: c.warnings,
     complianceNote: c.complianceNote,
+    whitelist: {
+      status: c.whitelist.status,
+      statusLabel: WHITELIST_STATUS_LABEL[c.whitelist.status] ?? c.whitelist.status,
+      matchedName: c.whitelist.matchedName,
+      matchedSeq: c.whitelist.matchedSeq,
+      basis: c.whitelist.basis,
+      visible: (WHITELIST_VISIBLE_STATUSES as readonly string[]).includes(c.whitelist.status),
+    },
   };
 }
