@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>往期详情 · 武汉教育赛事雷达</title>
+<meta name="description" content="武汉教育赛事雷达往期单期内容，含主推活动完整信息与关键节点。">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="assets/radar.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="hd">
+    <div class="hd-inner">
+      <div class="hd-text">
+        <h1>往期详情</h1>
+        <div class="sub" id="subTtl">正在加载…</div>
+      </div>
+      <a class="back" href="archive.html">往期</a>
+    </div>
+  </header>
+
+  <div id="edition" style="display:none" class="edition"></div>
+  <div id="notice"></div>
+  <main id="app">
+    <div class="skel"></div><div class="skel"></div>
+    <div class="loading">正在加载…</div>
+  </main>
+
+  <footer class="ft">
+    信息来源为公开渠道，本平台仅作信息告知，<b>不组织报名、不代收作品、不开展赛事培训、不承诺获奖结果</b>，亦不与升学、评优关联表述。<br>
+    <span class="disc">「竞赛白名单」指列入教育部《2025—2028学年面向中小学生的全国性竞赛活动名单》的竞赛。该名单只约束全国性竞赛，未列入不等于活动存在问题，不构成对任何活动或主办方的推荐与评价。具体赛制与报名要求请以主办方官方通知为准。</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  // 数据源解析与 index.html / archive.html 完全一致，三处行为不允许分叉
+  var API_PROD = "https://admin.eanavi.com/api/content/radar";
+  var API_DEV = "http://localhost:3001/api/content/radar";
+  var API = (function () {
+    var m = /[?&]api=([^&]*)/.exec(location.search);
+    if (m) return decodeURIComponent(m[1]).replace(/\/+$/, "");
+    var h = location.hostname;
+    if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "") return API_DEV;
+    return API_PROD;
+  })();
+
+  var ID = (function () {
+    var m = /[?&]id=([^&]*)/.exec(location.search);
+    return m ? decodeURIComponent(m[1]).trim() : "";
+  })();
+
+  var app = document.getElementById("app");
+  var editionBox = document.getElementById("edition");
+  var noticeBox = document.getElementById("notice");
+  var subTtl = document.getElementById("subTtl");
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function rows(list) {
+    return list.filter(function (x) { return x && x.v; })
+      .map(function (x) {
+        return '<div class="row"><div class="k">' + esc(x.k) + '</div><div class="v">' + x.v + '</div></div>';
+      }).join("");
+  }
+
+  function link(url, label) {
+    if (!url) return "";
+    return '<a href="' + esc(url) + '" rel="noopener noreferrer">' + esc(label || url) + '</a>';
+  }
+
+  function dayText(n) {
+    if (typeof n !== "number" || !isFinite(n)) return "";
+    if (n === 0) return "今天截止";
+    if (n > 0) return "剩 " + n + " 天";
+    return "已结束";
+  }
+
+  // 与首页同源的盾牌图标与判定：只有 confirmed / not_listed 显示，
+  // 其余态一律不标，避免让人误读成「没标的都有问题」。
+  var WL_SHIELD = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" aria-hidden="true">' +
+    '<path d="M8 1.2l5.4 2v4.5c0 3.3-2.2 6.2-5.4 7.5-3.2-1.3-5.4-4.2-5.4-7.5V3.2l5.4-2z" fill="currentColor" opacity=".32"/>' +
+    '<path d="M7.1 10.8L4.5 8.2l1.1-1.1 1.5 1.5 3.2-3.2 1.1 1.1-4.3 4.3z" fill="currentColor"/></svg>';
+
+  function wlTag(it) {
+    var wl = it.whitelist || {};
+    if (wl.status === "confirmed") {
+      return '<span class="wlbadge" title="' + esc(wl.basis || "") + '">' + WL_SHIELD +
+        esc("教育部竞赛白名单" + (wl.matchedSeq ? " · 第 " + wl.matchedSeq + " 项" : "")) + '</span>';
+    }
+    if (wl.status === "not_listed") {
+      return '<span class="tag wlc" title="' + esc(wl.basis || "") + '">非名单内竞赛</span>';
+    }
+    return "";
+  }
+
+  function wlChip(it) {
+    var wl = it.whitelist || {};
+    if (wl.status === "confirmed") {
+      return '<span class="nmchip hit" title="' + esc(wl.basis || "") + '">' + WL_SHIELD + '名单内' +
+        (wl.matchedSeq ? " 第 " + wl.matchedSeq + " 项" : "") + '</span>';
+    }
+    if (wl.status === "not_listed") {
+      return '<span class="nmchip n" title="' + esc(wl.basis || "") + '">非名单内</span>';
+    }
+    return "";
+  }
+
+  function wlRow(it) {
+    var wl = it.whitelist || {};
+    if (wl.status === "confirmed") {
+      return esc(wl.matchedName || "") + (wl.matchedSeq ? "（名单第 " + wl.matchedSeq + " 项）" : "");
+    }
+    if (wl.status === "not_listed") {
+      return '非名单内竞赛 <span style="color:#8a92a8">（该名单只约束全国性竞赛，不构成对活动本身的评价）</span>';
+    }
+    return "";
+  }
+
+  /** 主推卡：字段与首页 mainCard 一一对应，只是标题措辞改为「当期」以明确其为历史陈述 */
+  function mainCard(it, idx) {
+    var tags = ['<span class="tag hot">' + esc(it.categoryLabel) + '</span>'];
+    if (it.gradeLabel) tags.push('<span class="tag">' + esc(it.gradeLabel) + '</span>');
+    if (it.roleLabel) tags.push('<span class="tag">' + esc(it.roleLabel) + '</span>');
+    if (it.regionLabel) tags.push('<span class="tag">' + esc(it.regionLabel) + '</span>');
+    var wlT = wlTag(it);
+    if (wlT) tags.unshift(wlT);
+
+    var body = rows([
+      { k: "主办方", v: esc(it.organizer) },
+      it.coOrganizer ? { k: "承办", v: esc(it.coOrganizer) } : null,
+      { k: "参赛对象", v: esc(it.audienceRaw) },
+      wlRow(it) ? { k: "竞赛名单", v: wlRow(it) } : null,
+      {
+        k: it.keyDateTypeLabel,
+        v: esc(it.keyDate) + (dayText(it.daysToKeyDate)
+          ? ' <span class="tag done">' + dayText(it.daysToKeyDate) + '</span>' : "")
+      },
+      it.timeRange ? { k: "活动时间", v: esc(it.timeRange) } : null,
+      it.location ? { k: "地点", v: esc(it.location) } : null,
+      { k: "费用", v: esc(it.feeLabel) },
+      { k: "报名方式", v: esc(it.signupMethod) },
+      it.notes ? { k: "备注", v: esc(it.notes) } : null,
+      { k: "信息来源", v: link(it.sourceUrl, it.sourceName) }
+    ].filter(Boolean));
+
+    var sib = "";
+    if (it.siblings && it.siblings.length) {
+      sib = '<div class="subline">同系列：' + it.siblings.map(function (s) {
+        var bits = [];
+        if (s.location) bits.push(s.location);
+        if (s.signupMethod) bits.push(s.signupMethod);
+        return esc(s.name) + (bits.length ? "（" + esc(bits.join("；")) + "）" : "");
+      }).join("；") + '</div>';
+    }
+
+    return '<div class="card" id="ev-' + idx + '">' +
+      '<h3 class="ttl">' + esc(it.name) + '</h3>' +
+      '<div class="tags">' + tags.join("") + '</div>' +
+      body + sib +
+      (it.complianceNote ? '<div class="guard">' + esc(it.complianceNote) + '</div>' : "") +
+      '</div>';
+  }
+
+  function altTable(list, offset) {
+    return '<table class="tb"><thead><tr><th>活动</th><th>参赛对象</th><th style="width:96px">关键节点</th></tr></thead><tbody>' +
+      list.map(function (it, i) {
+        return '<tr id="ev-' + (offset + i) + '"><td><div class="nm">' + esc(it.name) + wlChip(it) + '</div>' +
+          '<div class="org">' + esc(it.organizer) + '</div></td>' +
+          '<td>' + esc(it.gradeLabel) + '<div class="org">' + esc(it.roleLabel) + '</div></td>' +
+          '<td>' + esc(it.keyDateTypeLabel) + '<div class="org">' + esc(it.keyDate) + '</div></td></tr>';
+      }).join("") + '</tbody></table>';
+  }
+
+  function briefBlock(list) {
+    return '<div class="brief">' + list.map(function (it) {
+      return '<div class="brow"><div class="bl"><div class="bn">' + esc(it.name) + '</div>' +
+        '<div class="bo">' + esc(it.organizer) + '</div></div>' +
+        '<div class="bd">' + esc(it.keyDateTypeLabel) + '<br>' + esc(it.keyDate) + '</div></div>';
+    }).join("") + '</div>';
+  }
+
+  function stateBlock(title, desc, act) {
+    return '<div class="state"><div class="em">' + esc(title) + '</div>' +
+      '<div class="ds">' + esc(desc) + '</div>' + (act || "") + '</div>';
+  }
+
+  function renderEdition(ed, isCurrent) {
+    if (!ed) { editionBox.style.display = "none"; return; }
+    editionBox.style.display = "flex";
+    var win = ed.windowStart && ed.windowEnd ? ed.windowStart + " ~ " + ed.windowEnd : ed.runDate;
+    editionBox.innerHTML =
+      '<div><div class="k">本期覆盖</div><div class="v">' + esc(win) + '</div></div>' +
+      (ed.publishedAt ? '<div><div class="k">发布</div><div class="v">' + esc(String(ed.publishedAt).slice(0, 10)) + '</div></div>' : '') +
+      (isCurrent ? '<div class="stale">这是当前正在展示的一期，内容与首页一致</div>' : '');
+    subTtl.textContent = ed.title || (win);
+  }
+
+  function render(data) {
+    if (data.status === "not-found") {
+      renderEdition(null, false);
+      subTtl.textContent = "内容不可查看";
+      app.innerHTML = stateBlock(
+        "该期内容不存在或已不再公开",
+        "链接可能已失效，或这一期已被整期下架。可以回到往期列表看看其他期次。",
+        '<a class="act" href="archive.html">返回往期列表</a>'
+      );
+      return;
+    }
+
+    var groups = data.groups || { A: [], B: [], C: [] };
+    var total = groups.A.length + groups.B.length + groups.C.length;
+    renderEdition(data.edition, !!data.isCurrent);
+
+    if (!total) {
+      app.innerHTML = stateBlock(
+        "该期内容已全部撤下",
+        data.notice || "这一期的条目已全部下架，暂无可查看的内容。",
+        '<a class="act" href="archive.html">返回往期列表</a>'
+      );
+      return;
+    }
+
+    // 当前期不重复劝退，历史期次必须显式声明「已结束」
+    var note = data.isCurrent ? "" :
+      '<div class="archive-note"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">' +
+      '<circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.3"/>' +
+      '<path d="M8 4.6v3.9M8 11.1v.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+      '<div><b>这是往期存档。</b>相关活动多已结束，仅供回溯查阅，<b>请勿据此报名</b>。' +
+      '当期可报名活动请看 <a href="index.html" style="color:#8a6212;text-decoration:underline">本期</a>。</div></div>';
+
+    var html = note;
+    var offset = 0;
+
+    if (groups.A.length) {
+      html += '<div class="sec"><h2>当期主推</h2><span>' + groups.A.length + ' 项</span></div>';
+      html += groups.A.map(function (it, i) { return mainCard(it, i); }).join("");
+      offset = groups.A.length;
+    }
+    if (groups.B.length) {
+      html += '<div class="sec"><h2>其他活动</h2><span>可一并了解</span></div>';
+      html += altTable(groups.B, offset);
+      offset += groups.B.length;
+    }
+    if (groups.C.length) {
+      html += '<div class="sec"><h2>当期简讯</h2><span>了解动态，不作主推</span></div>';
+      html += briefBlock(groups.C);
+    }
+
+    app.innerHTML = html;
+
+    // 异步渲染后浏览器不会自动跳到 hash 位置，需手动定位：
+    // 从往期列表的搜索直达某条活动时依赖这个锚点。
+    if (location.hash && /^#ev-\d+$/.test(location.hash)) {
+      var el = document.getElementById(location.hash.slice(1));
+      if (el) {
+        setTimeout(function () { el.scrollIntoView({ behavior: "smooth", block: "center" }); }, 60);
+      }
+    }
+  }
+
+  function renderError(msg) {
+    editionBox.style.display = "none";
+    subTtl.textContent = "加载失败";
+    app.innerHTML =
+      '<div class="state err"><div class="em">加载失败，请重试</div>' +
+      '<div class="ds">未能连接到内容服务' + (msg ? '（' + esc(msg) + '）' : '') +
+      '。<br>这不代表该期内容不存在。</div>' +
+      '<button class="retry" id="retryBtn">重新加载</button></div>';
+    var btn = document.getElementById("retryBtn");
+    if (btn) btn.addEventListener("click", load);
+  }
+
+  var loading = false;
+  function load() {
+    if (loading) return;
+    if (!ID) {
+      subTtl.textContent = "缺少期次参数";
+      app.innerHTML = stateBlock(
+        "没有指定要查看的期次",
+        "请从往期列表进入，或检查链接是否完整。",
+        '<a class="act" href="archive.html">返回往期列表</a>'
+      );
+      return;
+    }
+    loading = true;
+    app.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="loading">正在加载…</div>';
+
+    var url = API + "/archive/" + encodeURIComponent(ID) + "?t=" + Date.now();
+    fetch(url, { cache: "no-store" })
+      .then(function (r) {
+        // 404 是有意义的业务结果，需要读 body；其余非 2xx 视为故障。
+        // 一律先读 text 再解析，避免生产环境 500 空 body 触发 JSON 解析异常。
+        return r.text().then(function (txt) {
+          var data = null;
+          if (txt) { try { data = JSON.parse(txt); } catch (e) { data = null; } }
+          if (data && (data.status === "not-found" || data.status === "ok" || data.status === "empty")) return data;
+          if (!r.ok) throw new Error("HTTP " + r.status + (data && data.notice ? "：" + data.notice : ""));
+          if (data && data.status === "error") throw new Error(data.error || data.notice || "服务端处理失败");
+          throw new Error(!txt ? "服务返回空内容" : "返回内容无法解析");
+        });
+      })
+      .then(function (data) { render(data); })
+      .catch(function (e) { renderError(e && e.message ? e.message : ""); })
+      .then(function () { loading = false; });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

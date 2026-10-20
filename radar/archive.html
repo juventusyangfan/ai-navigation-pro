@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>往期回顾 · 武汉教育赛事雷达</title>
+<meta name="description" content="武汉教育赛事雷达往期内容存档，可回溯每期主推活动与关键节点。">
+<link rel="stylesheet" href="assets/radar.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="hd">
+    <div class="hd-inner">
+      <div class="hd-text">
+        <h1>往期回顾</h1>
+        <div class="sub">按发布时间倒序，可回溯每一期的完整内容</div>
+      </div>
+      <a class="back" href="index.html">本期</a>
+    </div>
+  </header>
+
+  <div class="archive-note">
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.3"/>
+      <path d="M8 4.6v3.9M8 11.1v.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <div><b>以下为历史存档内容。</b>相关活动多已结束，仅供回溯查阅，<b>请勿据此报名</b>；当期可报名的活动请看「本期」。具体安排以主办方官方通知为准。</div>
+  </div>
+
+  <div class="search" id="searchBox">
+    <svg viewBox="0 0 16 16" width="15" height="15" fill="none" aria-hidden="true">
+      <circle cx="7.2" cy="7.2" r="4.6" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M10.6 10.6L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+    <input id="q" type="search" placeholder="搜索期次或活动名称" autocomplete="off" enterkeyhint="search">
+    <button class="clr" id="clr" type="button" aria-label="清空">×</button>
+  </div>
+
+  <main id="app">
+    <div class="skel"></div><div class="skel"></div><div class="skel"></div>
+    <div class="loading">正在加载…</div>
+  </main>
+
+  <footer class="ft">
+    信息来源为公开渠道，本平台仅作信息告知，<b>不组织报名、不代收作品、不开展赛事培训、不承诺获奖结果</b>，亦不与升学、评优关联表述。<br>
+    <span class="disc">「竞赛白名单」指列入教育部《2025—2028学年面向中小学生的全国性竞赛活动名单》的竞赛。该名单只约束全国性竞赛，未列入不等于活动存在问题，不构成对任何活动或主办方的推荐与评价。</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  // 与 index.html 同一套数据源解析规则：按 hostname 选择，?api= 可临时覆盖。
+  // 这里的 API 指向「主接口」的父路径，往期接口在其后追加 /archive，
+  // 这样 ?api= 覆盖时两个页面行为一致，不必各自维护一份地址。
+  var API_PROD = "https://admin.eanavi.com/api/content/radar";
+  var API_DEV = "http://localhost:3001/api/content/radar";
+  var API = (function () {
+    var m = /[?&]api=([^&]*)/.exec(location.search);
+    if (m) return decodeURIComponent(m[1]).replace(/\/+$/, "");
+    var h = location.hostname;
+    if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "") return API_DEV;
+    return API_PROD;
+  })();
+
+  var app = document.getElementById("app");
+  var qInput = document.getElementById("q");
+  var searchBox = document.getElementById("searchBox");
+  var clrBtn = document.getElementById("clr");
+
+  var ALL = [];      // 全量期次，过滤在前端做（期次数量级很小）
+  var loaded = false;
+  var loading = false;
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function mmdd(d) {
+    if (!d || typeof d !== "string") return "";
+    var p = d.split("-");
+    return p.length === 3 ? p[1] + "/" + p[2] : d;
+  }
+
+  function dayOnly(iso) {
+    if (!iso) return "";
+    return String(iso).slice(0, 10);
+  }
+
+  function stateBlock(title, desc, act) {
+    return '<div class="state"><div class="em">' + esc(title) + '</div>' +
+      '<div class="ds">' + esc(desc) + '</div>' +
+      (act || "") + '</div>';
+  }
+
+  function renderError(msg) {
+    app.innerHTML =
+      '<div class="state err"><div class="em">加载失败，请重试</div>' +
+      '<div class="ds">未能连接到内容服务' + (msg ? '（' + esc(msg) + '）' : '') +
+      '。<br>这不代表往期内容不存在。</div>' +
+      '<button class="retry" id="retryBtn">重新加载</button></div>';
+    var btn = document.getElementById("retryBtn");
+    if (btn) btn.addEventListener("click", load);
+  }
+
+  function edCard(ed) {
+    var c = ed.counts || { A: 0, B: 0, C: 0 };
+    var cnt = [
+      '<span class="c a' + (c.A ? "" : " zero") + '">主推 ' + (c.A || 0) + '</span>',
+      '<span class="c' + (c.B ? "" : " zero") + '">备选 ' + (c.B || 0) + '</span>',
+      '<span class="c' + (c.C ? "" : " zero") + '">简讯 ' + (c.C || 0) + '</span>'
+    ].join("");
+
+    var hl = "";
+    if (ed.highlights && ed.highlights.length) {
+      hl = '<div class="hl">' +
+        ed.highlights.map(function (h) {
+          var mark = h.whitelistStatus === "confirmed"
+            ? '<span class="nmchip hit" title="列入教育部竞赛白名单">名单内' + (h.matchedSeq ? " 第 " + h.matchedSeq + " 项" : "") + '</span>'
+            : "";
+          return "<b>" + esc(h.name) + "</b>" + mark;
+        }).join('<span class="dot">·</span>') +
+        '</div>';
+    }
+
+    var meta = [];
+    if (ed.windowStart && ed.windowEnd) {
+      meta.push('<span>覆盖 <b>' + esc(mmdd(ed.windowStart)) + " — " + esc(mmdd(ed.windowEnd)) + '</b></span>');
+    }
+    if (ed.publishedAt) meta.push('<span>发布 <b>' + esc(dayOnly(ed.publishedAt)) + '</b></span>');
+    meta.push('<span>共 <b>' + (ed.items || 0) + '</b> 项</span>');
+
+    return '<a class="edcard" href="edition.html?id=' + encodeURIComponent(ed.id) + '">' +
+      '<div class="top"><div class="win">' + esc(ed.title || (mmdd(ed.windowStart) + " — " + mmdd(ed.windowEnd))) + '</div>' +
+      '<div class="go">查看 ›</div></div>' +
+      '<div class="meta">' + meta.join("") + '</div>' +
+      '<div class="cnt">' + cnt + '</div>' +
+      hl +
+      '</a>';
+  }
+
+  function paint() {
+    var kw = qInput.value.trim().toLowerCase();
+    var list = ALL;
+
+    if (kw) {
+      list = ALL.filter(function (ed) {
+        var hay = [
+          ed.title || "",
+          ed.windowStart || "",
+          ed.windowEnd || "",
+          (ed.highlights || []).map(function (h) { return h.name; }).join(" ")
+        ].join(" ").toLowerCase();
+        return hay.indexOf(kw) >= 0;
+      });
+    }
+
+    if (!ALL.length) {
+      app.innerHTML = stateBlock(
+        "暂无往期",
+        "当前只有一期内容，暂时没有可回溯的历史期次。新一期发布后，本期内容会自动归档到这里。",
+        '<a class="act" href="index.html">查看本期</a>'
+      );
+      return;
+    }
+
+    if (!list.length) {
+      app.innerHTML = '<div class="state"><div class="em">没有匹配的期次</div>' +
+        '<div class="ds">换个关键词试试，或清空搜索查看全部 ' + ALL.length + ' 期。</div></div>';
+      return;
+    }
+
+    app.innerHTML =
+      '<div class="sec"><h2>' + (kw ? "搜索结果" : "全部往期") + '</h2>' +
+      '<span>' + list.length + ' 期' + (kw ? " / 共 " + ALL.length + " 期" : "") + '</span></div>' +
+      list.map(edCard).join("");
+  }
+
+  function load() {
+    if (loading) return;
+    loading = true;
+    app.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="loading">正在加载…</div>';
+
+    var url = API + "/archive?t=" + Date.now();
+    fetch(url, { cache: "no-store" })
+      .then(function (r) {
+        // 线上接口出错时 body 可能是空的（Next.js 生产环境的 500），
+        // 直接 r.json() 会抛「Unexpected end of JSON input」，与真实原因无关。
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.text();
+      })
+      .then(function (txt) {
+        if (!txt) throw new Error("服务返回空内容");
+        var data;
+        try { data = JSON.parse(txt); } catch (e) { throw new Error("返回内容不是有效 JSON"); }
+        if (data.status === "error") throw new Error(data.error || data.notice || "服务端处理失败");
+        ALL = Array.isArray(data.editions) ? data.editions : [];
+        loaded = true;
+        paint();
+      })
+      .catch(function (e) { renderError(e && e.message ? e.message : ""); })
+      .then(function () { loading = false; });
+  }
+
+  qInput.addEventListener("input", function () {
+    searchBox.classList.toggle("has", !!qInput.value);
+    if (loaded) paint();
+  });
+  clrBtn.addEventListener("click", function () {
+    qInput.value = "";
+    searchBox.classList.remove("has");
+    qInput.focus();
+    if (loaded) paint();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
