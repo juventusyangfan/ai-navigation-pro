@@ -1,0 +1,46 @@
+2026-10-21 17:02:51: 
+2026-10-21 17:02:51: > zuowen@1.0.0 start
+2026-10-21 17:02:51: > next start -p 3002
+2026-10-21 17:02:51: 
+2026-10-21 17:02:51:    ▲ Next.js 15.5.28
+2026-10-21 17:02:51:    - Local:        http://localhost:3002
+2026-10-21 17:02:51:    - Network:      http://10.0.0.14:3002
+2026-10-21 17:02:51: 
+2026-10-21 17:02:51:  ✓ Starting...
+2026-10-21 17:02:52:  ✓ Ready in 552ms
+2026-10-21 17:06:03: 
+2026-10-21 17:06:03: > zuowen@1.0.0 start
+2026-10-21 17:06:03: > next start -p 3002
+2026-10-21 17:06:03: 
+2026-10-21 17:06:03:    ▲ Next.js 15.5.28
+2026-10-21 17:06:03:    - Local:        http://localhost:3002
+2026-10-21 17:06:03:    - Network:      http://10.0.0.14:3002
+2026-10-21 17:06:03: 
+2026-10-21 17:06:03:  ✓ Starting...
+2026-10-21 17:06:03:  ✓ Ready in 317ms
+2026-10-21 17:06:54: prisma:error 
+2026-10-21 17:06:54: Invalid `prisma.essayReview.count()` invocation:
+2026-10-21 17:06:54: 
+2026-10-21 17:06:54: 
+2026-10-21 17:06:54: The table `main.EssayReview` does not exist in the current database.
+2026-10-21 17:09:12: 
+2026-10-21 17:09:12: > zuowen@1.0.0 start
+2026-10-21 17:09:12: > next start -p 3002
+2026-10-21 17:09:12: 
+2026-10-21 17:09:12:    ▲ Next.js 15.5.28
+2026-10-21 17:09:12:    - Local:        http://localhost:3002
+2026-10-21 17:09:12:    - Network:      http://10.0.0.14:3002
+2026-10-21 17:09:12: 
+2026-10-21 17:09:12:  ✓ Starting...
+2026-10-21 17:09:13:  ✓ Ready in 317ms
+2026-10-21 17:18:46: 
+2026-10-21 17:18:46: > zuowen@1.0.0 start
+2026-10-21 17:18:46: > next start -p 3002
+2026-10-21 17:18:46: 
+2026-10-21 17:18:46:    ▲ Next.js 15.5.28
+2026-10-21 17:18:46:    - Local:        http://localhost:3002
+2026-10-21 17:18:46:    - Network:      http://10.0.0.14:3002
+2026-10-21 17:18:46: 
+2026-10-21 17:18:46:  ✓ Starting...
+2026-10-21 17:18:46:  ✓ Ready in 357ms
+2026-10-21 17:20:00: [zuowen][evaluate] id=cmvhwij9u0000b5wdde51x8pg grade=3 source=image chars=108 total=68 tokens={"prompt_tokens":908,"completion_tokens":304,"total_tokens":1212,"prompt_tokens_details":{"cached_tokens":768},"prompt_cache_hit_tokens":768,"prompt_cache_miss_tokens":140}
