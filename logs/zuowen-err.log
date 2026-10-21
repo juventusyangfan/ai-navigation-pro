@@ -1,0 +1,26 @@
+2026-10-21 17:04:04: [zuowen][evaluate] 未配置 ZW_LLM_API_KEY
+2026-10-21 17:06:54: [zuowen:evaluate] 未捕获异常： Error [PrismaClientKnownRequestError]: 
+2026-10-21 17:06:54: Invalid `prisma.essayReview.count()` invocation:
+2026-10-21 17:06:54: 
+2026-10-21 17:06:54: 
+2026-10-21 17:06:54: The table `main.EssayReview` does not exist in the current database.
+2026-10-21 17:06:54:     at async H (.next/server/app/api/evaluate/route.js:1:7193)
+2026-10-21 17:06:54:     at async f (.next/server/chunks/697.js:1:3875)
+2026-10-21 17:06:54:     at async k (.next/server/app/api/evaluate/route.js:1:12317) {
+2026-10-21 17:06:54:   code: 'P2021',
+2026-10-21 17:06:54:   meta: [Object],
+2026-10-21 17:06:54:   clientVersion: '6.19.3'
+2026-10-21 17:06:54: }
+2026-10-21 17:10:09: [zuowen][evaluate] 模型异常 code=UPSTREAM status=undefined 模型调用失败: Cannot convert argument to a ByteString because the character at index 15 has a value of 23494 which is greater than 255.
+2026-10-21 17:10:23: [zuowen][evaluate] 模型异常 code=UPSTREAM status=undefined 模型调用失败: Cannot convert argument to a ByteString because the character at index 15 has a value of 23494 which is greater than 255.
+2026-10-21 17:11:50: [zuowen][evaluate] 模型异常 code=UPSTREAM status=undefined 模型调用失败: Cannot convert argument to a ByteString because the character at index 15 has a value of 23494 which is greater than 255.
+2026-10-21 17:14:29: [Error: The Server Reference ID did not match the expected format. Received "y".
+2026-10-21 17:14:29: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
+2026-10-21 17:14:33: [Error: The Server Reference ID did not match the expected format. Received "y".
+2026-10-21 17:14:33: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
+2026-10-21 17:14:35: [Error: The Server Reference ID did not match the expected format. Received "y".
+2026-10-21 17:14:35: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
+2026-10-21 17:14:35: [Error: The Server Reference ID did not match the expected format. Received "y".
+2026-10-21 17:14:35: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
+2026-10-21 17:14:40: [Error: The Server Reference ID did not match the expected format. Received "y".
+2026-10-21 17:14:40: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
