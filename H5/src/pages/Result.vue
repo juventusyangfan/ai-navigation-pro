@@ -76,6 +76,11 @@
         </div>
       </section>
 
+      <FollowQr
+        title="想让发音再准一点？"
+        lead="「树蕙伴学」每周会发一次英语听说的练习方法和短练习；孩子这次哪几个音不准，也可以直接加老师企业微信问。"
+      />
+
       <p class="disclaimer">
         本结果为练习反馈，评分引擎与考试阅卷标准不一致，不代表任何考试的预测或实际得分。
       </p>
@@ -92,6 +97,7 @@ import { onUnmounted, ref } from 'vue'
 import { navigate } from '../router.js'
 import { loadResult, getAudio } from '../services/store.js'
 import { playRecorded, stopPlayback } from '../services/player.js'
+import FollowQr from '../components/FollowQr.vue'
 
 const result = ref(loadResult())
 const playingId = ref('')

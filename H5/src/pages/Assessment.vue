@@ -32,6 +32,13 @@
       <p v-else class="muted small">尚未选择年级。</p>
     </section>
 
+    <!-- 未开始：关注引导。放在首屏说明之后，不挡「开始测评」 -->
+    <FollowQr
+      v-if="!started"
+      title="练完可以关注一下"
+      lead="「树蕙伴学」每周更新一次英语听说练习；测评结果想请老师看一眼，加老师企业微信就行。"
+    />
+
     <!-- 答题中 -->
     <template v-else>
       <div class="progress">
@@ -174,6 +181,7 @@ import { startReadAloud, pcmToWav, toArrayBuffer } from '../services/soeSdk.js'
 import { playRecorded, stopPlayback } from '../services/player.js'
 import { buildResult } from '../services/evaluator.js'
 import { saveResult, setAudio } from '../services/store.js'
+import FollowQr from '../components/FollowQr.vue'
 
 const started = ref(false)
 const selectedGrade = ref('')

@@ -1,0 +1,40 @@
+// 树蕙伴学 · 写作水平测评 —— 数据模型
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+//
+// 设计取舍（与合规红线直接相关，改动前请先读）：
+// 1. 不保存上传的原图。图片只在内存中解码、送给模型、随即丢弃，
+//    落盘的只有模型识别出的正文，避免长期留存孩子的手写原件。
+// 2. 正文以 AES-256-GCM 密文保存（encText），只在生成报告与本人回看时解密。
+//    密钥来自 ZW_TEXT_KEY，缺失时生产环境拒绝入库、读侧降级为空串。
+// 3. 不收集姓名、学校、班级。anonId 是浏览器 Cookie 里的随机串，
+//    与任何真实身份无关，仅用于「同一设备每日限额」。
+// 4. ipHash 只用于滥用风控，单向哈希，不可反查。
+model EssayReview {
+  id        String   @id @default(cuid())
+  anonId    String
+  ipHash    String?
+  grade     Int
+  title     String?
+  genre     String?
+  charCount Int
+  source    String // text | image
+  readable  Boolean  @default(true)
+  encText   String // zw1:<iv>:<tag>:<ciphertext>
+  report    String // 报告 JSON（不含完整正文）
+  total     Int
+  level     String
+  model     String
+  createdAt DateTime @default(now())
+
+  @@index([anonId, createdAt])
+  @@index([createdAt])
+}

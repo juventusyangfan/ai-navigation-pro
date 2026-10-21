@@ -85,6 +85,52 @@ npm run dev                   # 监听 3001
 2. `.env`：`DATABASE_URL="postgresql://user:pass@host:5432/ea?schema=public"`。
 3. `npm run db:init` 重新建表灌库。其余代码（serialize/API）无需改动。
 
+## 作文测评看板（essays）
+
+侧边栏「服务 → 作文测评」。展示「树蕙伴学」服务号里家长提交的作文评测记录：列表、筛选、
+统计、单篇报告，以及按需查看原文。
+
+**数据不在 admin 库里**。作文在 `zuowen/` 这个独立应用（进程 3002、独立 SQLite），
+admin 通过它的内部接口读取，两个原因：
+
+1. 正文是 AES-256-GCM 密文，密钥只在 `zuowen/.env` 的 `ZW_TEXT_KEY`。admin 刻意**不持有解密能力** ——
+   后台即使被拿下，拿到的也只是密文。
+2. 各自一个库，跨库直读会让 schema 变更互相绊住，删表这类操作的影响面也会翻倍。
+
+代价是多一跳本地回环请求（< 5ms）。
+
+### 配置
+
+`admin/.env` 增加三项：
+
+```
+ZUOWEN_BASE_URL=http://127.0.0.1:3002       # 同机部署走回环，不出公网
+ZUOWEN_CRON_TOKEN=...                        # 必须与 zuowen 的 ZW_CRON_TOKEN 完全一致
+ZUOWEN_PUBLIC_BASE=https://zuowen.eanavi.com # 详情页「复制报告链接」用
+```
+
+权限（幂等，不动业务数据）：
+
+```bash
+npm run db:seed:essays     # editor / reviewer 获得 essays:read
+```
+
+### 接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/admin/essays` | 列表 + 统计，参数 `page/grade/source/level/q/min/max/days` |
+| GET | `/api/admin/essays/[id]` | 单篇详情，`?text=1` 才返回解密正文 |
+| GET | `/api/admin/essays/export` | 导出 CSV（**只含指标，不含正文**） |
+
+### 这一块刻意不做的事
+
+- **不提供删除**：家长手里的报告链接长期有效，后台删一条等于让某个家庭刚收到的报告变成 404。
+- **不导出正文**：导出文件会离开系统（邮件、微信、U 盘），是最容易失控的一环。
+- **不默认展示原文**：详情页要先点「显示原文」，避免作文在办公室/投屏场景被无意铺开。
+
+未配置服务时页面不会白屏，会显示「作文测评服务未接通」并给出要补的环境变量。
+
 ## 安全提醒
 
 - `AUTH_SECRET` 生产务必替换；会话 Cookie 为 httpOnly + sameSite=lax。
