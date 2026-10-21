@@ -1,0 +1,13 @@
+node_modules
+.next
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+prisma/*.db
+tsconfig.tsbuildinfo
+.DS_Store
+
+# 本地用 NEXT_DIST_DIR 另建的构建/开发产物（见 next.config.mjs）
+.next-*

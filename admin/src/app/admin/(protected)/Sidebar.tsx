@@ -27,6 +27,12 @@ const NAV: { group: string; items: { href: string; label: string }[] }[] = [
       { href: "/admin/analytics", label: "数据看板" },
     ],
   },
+  {
+    // 独立业务（不属于内容中台）：作文测评是「树蕙伴学」服务号的家长端工具，
+    // 数据在 zuowen 自己的库里，这里只看不写。
+    group: "服务",
+    items: [{ href: "/admin/essays", label: "作文测评" }],
+  },
 ];
 
 export default function Sidebar({ name, role }: { name: string; role: string }) {

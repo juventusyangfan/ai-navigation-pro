@@ -464,3 +464,55 @@ body {
 .empty {
   text-align: center;
 }
+
+/* ---------- 引流二维码 ---------- */
+.follow-lead {
+  margin: 0 0 12px;
+}
+
+.qr-row {
+  display: flex;
+  gap: 10px;
+}
+
+.qr-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.qr-img {
+  width: 104px;
+  height: 104px;
+  display: block;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.qr-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.qr-label {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+  text-align: center;
+}
+
+.qr-hint {
+  margin: 10px 0 0;
+  text-align: center;
+}
