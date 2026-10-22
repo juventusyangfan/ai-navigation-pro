@@ -3,3 +3,18 @@ admin/prisma/dev.db
 .env
 .env.*
 !.env.example
+
+# 任意命名的 env 文件（prod.env / deploy.env / config/secrets.env 等）
+# 上面的 .env.* 只挡得住「点号开头」的写法，挡不住 prod.env 这类
+*.env
+!.env.example
+
+# 密钥与凭据文件
+*.pem
+*.p12
+*.pfx
+*.keystore
+id_rsa
+id_rsa.*
+credentials.json
+secrets.json
