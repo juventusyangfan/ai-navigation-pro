@@ -177,7 +177,7 @@ export default function DevicesPage() {
     <>
       <div className="page-head">
         <div>
-          <h1>设备额度</h1>
+          <h1>作文设备额度</h1>
           <div className="desc">
             家长加了企微要放开次数时用这里。按识别码搜到那台设备，改完保存即生效。
           </div>

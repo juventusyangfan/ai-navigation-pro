@@ -568,7 +568,11 @@ curl -s "http://127.0.0.1:8787/api/tts/health?probe=1"
 | GET | `/api/internal/quota/devices` | `x-cron-token` | 设备列表，`?q=7K3M9P` 按码搜（横杠可省）、`?page=&pageSize=` |
 | PATCH | `/api/internal/quota/devices/<CODE>` | `x-cron-token` | 改额度：`{limitMode, customLimit, note}` |
 
-内部接口在 `H5_INTERNAL_TOKEN` 未配置时**整体关闭**（fail-closed，不是无密码放行）。例：
+内部接口在 `H5_INTERNAL_TOKEN` 未配置时**整体关闭**（fail-closed，不是无密码放行）。
+
+**日常不用敲这些 curl**：admin 后台「服务 → 英语测评额度」就是这组接口的图形版
+（按码搜索、开关限制、填次数、写备注）。需要配 `H5_BASE_URL` + `H5_INTERNAL_TOKEN`
+（值必须与这里一致）并 `npm run db:seed:speaking` 授权。curl 留作应急或脚本化用。例：
 
 ```bash
 # 家长发来识别码 7K3-M9P
