@@ -44,3 +44,31 @@
 2026-10-21 17:18:46:  ✓ Starting...
 2026-10-21 17:18:46:  ✓ Ready in 357ms
 2026-10-21 17:20:00: [zuowen][evaluate] id=cmvhwij9u0000b5wdde51x8pg grade=3 source=image chars=108 total=68 tokens={"prompt_tokens":908,"completion_tokens":304,"total_tokens":1212,"prompt_tokens_details":{"cached_tokens":768},"prompt_cache_hit_tokens":768,"prompt_cache_miss_tokens":140}
+2026-10-21 17:46:05: [zuowen][evaluate] id=cmvhxg2yb0001b5wdy71kfy5j grade=3 source=image chars=226 total=68 tokens={"prompt_tokens":949,"completion_tokens":305,"total_tokens":1254,"prompt_tokens_details":{"cached_tokens":512},"prompt_cache_hit_tokens":512,"prompt_cache_miss_tokens":437}
+2026-10-21 17:54:31: [zuowen][evaluate] id=cmvhxqxmf0002b5wd51rasdfm grade=3 source=image chars=254 total=68 tokens={"prompt_tokens":986,"completion_tokens":328,"total_tokens":1314,"prompt_tokens_details":{"cached_tokens":512},"prompt_cache_hit_tokens":512,"prompt_cache_miss_tokens":474}
+2026-10-21 17:55:43: [zuowen][evaluate] id=cmvhxshbj0003b5wdmg8x6kfu grade=6 source=image chars=108 total=62 tokens={"prompt_tokens":908,"completion_tokens":329,"total_tokens":1237,"prompt_tokens_details":{"cached_tokens":0},"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":908}
+2026-10-22 10:37:48: 
+2026-10-22 10:37:48: > zuowen@1.0.0 start
+2026-10-22 10:37:48: > next start -p 3002
+2026-10-22 10:37:48: 
+2026-10-22 10:37:49:    ▲ Next.js 15.5.28
+2026-10-22 10:37:49:    - Local:        http://localhost:3002
+2026-10-22 10:37:49:    - Network:      http://10.0.0.14:3002
+2026-10-22 10:37:49: 
+2026-10-22 10:37:49:  ✓ Starting...
+2026-10-22 10:37:49:  ✓ Ready in 331ms
+2026-10-22 10:38:39: prisma:error 
+2026-10-22 10:38:39: Invalid `prisma.device.findMany()` invocation:
+2026-10-22 10:38:39: 
+2026-10-22 10:38:39: 
+2026-10-22 10:38:39: The table `main.Device` does not exist in the current database.
+2026-10-22 10:39:32: 
+2026-10-22 10:39:32: > zuowen@1.0.0 start
+2026-10-22 10:39:32: > next start -p 3002
+2026-10-22 10:39:32: 
+2026-10-22 10:39:32:    ▲ Next.js 15.5.28
+2026-10-22 10:39:32:    - Local:        http://localhost:3002
+2026-10-22 10:39:32:    - Network:      http://10.0.0.14:3002
+2026-10-22 10:39:32: 
+2026-10-22 10:39:32:  ✓ Starting...
+2026-10-22 10:39:33:  ✓ Ready in 318ms
