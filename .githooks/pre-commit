@@ -1,0 +1,28 @@
+#!/bin/sh
+# 提交前密钥拦截：挡住「忘了放 .env」「误填真实值」这类人为失误
+# 启用方式（clone 后执行一次）：git config core.hooksPath .githooks
+
+PATTERN='(sk-[A-Za-z0-9]{20,}|AKID[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)'
+
+FILES=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$FILES" ] && exit 0
+
+# .example 模板文件允许出现占位符，跳过
+CANDIDATES=$(printf '%s\n' "$FILES" | grep -vE '(^|/)\.env\.example$|\.example$')
+
+[ -z "$CANDIDATES" ] && exit 0
+
+HIT=$(printf '%s\n' "$CANDIDATES" | xargs grep -InE "$PATTERN" 2>/dev/null)
+
+if [ -n "$HIT" ]; then
+  echo ""
+  echo "⛔ 提交被拦截：检测到疑似密钥明文"
+  echo ""
+  printf '%s\n' "$HIT" | sed -E 's/(sk-|AKID|ghp_|xox[baprs]-)([A-Za-z0-9-]{4})[A-Za-z0-9-]*/\1\2****/g' | head -10
+  echo ""
+  echo "处理办法：把真实值挪进 .env（已被 .gitignore 忽略），提交里只留变量名。"
+  echo "确认是误报需强过：git commit --no-verify"
+  exit 1
+fi
+
+exit 0
