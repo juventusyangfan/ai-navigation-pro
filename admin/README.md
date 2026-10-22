@@ -131,9 +131,9 @@ npm run db:seed:essays     # editor: essays:read + devices:read/write；reviewer
 
 未配置服务时页面不会白屏，会显示「作文测评服务未接通」并给出要补的环境变量。
 
-## 设备额度（devices）
+## 作文设备额度（devices）
 
-侧边栏「服务 → 设备额度」。这是后台**唯一的写操作**：给某台设备放开/收紧每天的测评次数。
+侧边栏「服务 → 作文设备额度」。这是后台**唯一的写操作**：给某台设备放开/收紧每天的测评次数。
 
 **为什么以「设备」为单位**：zuowen 全程匿名，库里没有家长手机号、微信或孩子姓名，
 服务端手上只有 Cookie 里的随机 ID。所以每台设备配一个 **6 位识别码**（去掉 `0/1/O/I/L`），
@@ -161,6 +161,52 @@ npm run db:seed:essays   # 同一条命令顺带授予 devices 权限（幂等�
 - 备注只写内部标签（「张妈妈·四年级」），**不填手机号、微信号、孩子姓名**。
 
 每次改动都会在服务端日志留痕：`[admin][devices] 操作人 → 设备码 limitEnabled/customLimit`。
+
+## 英语测评额度（speaking）
+
+侧边栏「服务 → 英语测评额度」。给 H5 英语听说测评的家长设备放开/收紧每日次数。
+
+与「作文设备额度」是**两套独立数据**：H5 与 zuowen 各发各的 Cookie、各记各的账。
+同一个家长两个工具都用，会拿到两个不同的识别码，**不能串着查**。
+
+数据在 H5 的 `server/.data/quota.json`，次数扣减发生在它的 `/api/quota/start` 里。
+admin 同样只转发、不落副本 —— 一旦后台自己存一份，就会出现「后台显示已放开、
+家长仍被拦」这种最难查的对不上。
+
+### 配置
+
+```
+H5_BASE_URL=http://127.0.0.1:8787        # H5 后端进程，不是静态站的 80/443
+H5_INTERNAL_TOKEN=...                     # 必须与 H5 server/.env 的 H5_INTERNAL_TOKEN 完全一致
+H5_PUBLIC_BASE=https://h5.eanavi.com      # 仅文案用
+```
+
+权限：`speaking:read`（editor + reviewer）、`speaking:write`（**仅 editor**）。
+
+```bash
+npm run db:seed:speaking   # 幂等，只 upsert 权限行
+```
+
+H5 侧若没配 `H5_INTERNAL_TOKEN`，它的内部接口是**整体关闭**的（不是无密码放行），
+后台会显示「英语测评服务未接通」。
+
+### 接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/admin/speaking` | 列表，参数 `page/q` |
+| PATCH | `/api/admin/speaking/[code]` | 改额度，body `{ limitMode, customLimit, note }` |
+
+`limitMode` 三态：`default`（沿用默认次数）/ `custom`（1—200 次）/ `unlimited`（不限）。
+页面上的「限制」开关 + 次数框会自动映射成这三态，不用手写。
+
+两个额外的护栏：
+
+- `limitMode=custom` 必须带有效次数，否则 400。否则 H5 会静默回落成 `default`，
+  后台看起来「保存成功」但次数没变 —— 这种静默失败最难解释。
+- 页面会显示 H5 的 `H5_QUOTA_ENFORCE` 是否关闭。为 0 时只记账不拦截，改额度不生效。
+
+每次改动留痕：`[admin][speaking] 操作人 → 设备码 limitMode/customLimit/note`。
 
 ## 安全提醒
 

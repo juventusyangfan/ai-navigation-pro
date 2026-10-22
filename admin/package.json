@@ -12,6 +12,7 @@
     "db:seed:literacy": "tsx prisma/seed-literacy.ts",
     "db:seed:radar": "tsx prisma/seed-radar-perms.ts",
     "db:seed:essays": "tsx prisma/seed-essays-perms.ts",
+    "db:seed:speaking": "tsx prisma/seed-speaking-perms.ts",
     "db:init": "prisma db push && tsx prisma/seed.ts",
     "postinstall": "prisma generate"
   },
