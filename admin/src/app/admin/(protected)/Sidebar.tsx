@@ -29,9 +29,12 @@ const NAV: { group: string; items: { href: string; label: string }[] }[] = [
   },
   {
     // 独立业务（不属于内容中台）：作文测评是「树蕙伴学」服务号的家长端工具，
-    // 数据在 zuowen 自己的库里，这里只看不写。
+    // 数据在 zuowen 自己的库里。看板只读；设备额度可写（人工给家长放开次数）。
     group: "服务",
-    items: [{ href: "/admin/essays", label: "作文测评" }],
+    items: [
+      { href: "/admin/essays", label: "作文测评" },
+      { href: "/admin/devices", label: "设备额度" },
+    ],
   },
 ];
 

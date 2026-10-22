@@ -112,7 +112,7 @@ ZUOWEN_PUBLIC_BASE=https://zuowen.eanavi.com # 详情页「复制报告链接」
 权限（幂等，不动业务数据）：
 
 ```bash
-npm run db:seed:essays     # editor / reviewer 获得 essays:read
+npm run db:seed:essays     # editor: essays:read + devices:read/write；reviewer: essays:read + devices:read
 ```
 
 ### 接口
@@ -130,6 +130,37 @@ npm run db:seed:essays     # editor / reviewer 获得 essays:read
 - **不默认展示原文**：详情页要先点「显示原文」，避免作文在办公室/投屏场景被无意铺开。
 
 未配置服务时页面不会白屏，会显示「作文测评服务未接通」并给出要补的环境变量。
+
+## 设备额度（devices）
+
+侧边栏「服务 → 设备额度」。这是后台**唯一的写操作**：给某台设备放开/收紧每天的测评次数。
+
+**为什么以「设备」为单位**：zuowen 全程匿名，库里没有家长手机号、微信或孩子姓名，
+服务端手上只有 Cookie 里的随机 ID。所以每台设备配一个 **6 位识别码**（去掉 `0/1/O/I/L`），
+家长端页脚显示 `本机识别码 ABC-DEF`。
+
+操作流程：家长念出识别码 → 后台按码搜索 → 关掉「限制」= 当天不限次数，或把次数改成指定数字（留空 = 沿用默认 3 次）→ 保存即时生效。
+作文详情页左下角也有一个可点的设备码，点进去自动带上搜索条件。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/admin/devices` | 列表，参数 `page/q`。首次进入带 `sync=1`，给历史设备补识别码 |
+| PATCH | `/api/admin/devices/[code]` | 改额度，body `{ limitEnabled, customLimit, note }` |
+
+权限：`devices:read`（editor + reviewer）、`devices:write`（**仅 editor**）。
+不给 reviewer 写权限 —— 它直接控制成本与「谁能免限额」，和审核职责无关，出错代价不对等。
+
+```bash
+npm run db:seed:essays   # 同一条命令顺带授予 devices 权限（幂等）
+```
+
+**三个边界**：
+
+- 家长换手机、换浏览器、清缓存 → 识别码会变，需要重新开一次。
+- 放开个人次数**不会绕过** zuowen 的全站每日上限（默认 300 条），那道是防刷爆账单的硬顶。
+- 备注只写内部标签（「张妈妈·四年级」），**不填手机号、微信号、孩子姓名**。
+
+每次改动都会在服务端日志留痕：`[admin][devices] 操作人 → 设备码 limitEnabled/customLimit`。
 
 ## 安全提醒
 

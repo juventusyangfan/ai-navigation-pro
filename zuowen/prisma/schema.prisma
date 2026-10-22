@@ -38,3 +38,26 @@ model EssayReview {
   @@index([anonId, createdAt])
   @@index([createdAt])
 }
+
+//
+// 设备额度（2026-10-22 新增）
+//
+// 背景：家长加了企微之后，老板要人工给他放开每日次数。但 zuowen 不认识家长，
+// 手上只有 Cookie 里的随机 anonId —— 32 位十六进制，家长念不出来、老板也搜不了。
+// 所以给每台设备分配一个 6 位识别码，家长页面底部能看到，念给老师；
+// 老板在后台按码搜到那台设备，改额度。不依赖「猜哪条记录是谁」。
+//
+// 刻意不存手机号 / 微信号 / 学生姓名：
+// 一旦存了，这个库就从「匿名测评」变成「儿童与家长身份的关联库」，
+// 隐私条款要整体重写。note 只给运营写自己看得懂的标签（如「张妈妈·四年级」）。
+model Device {
+  anonId       String   @id
+  code         String   @unique // 6 位，去掉了 0/O/1/I/L 等易听错的字符
+  note         String?
+  limitEnabled Boolean  @default(true) // false = 该设备不限次数
+  customLimit  Int? // null = 用默认 ZW_DAILY_LIMIT；>0 = 后台指定的每日次数
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([updatedAt])
+}

@@ -173,7 +173,20 @@ export default function EssayDetailPage() {
               <div>模型：{item.model}</div>
               <div>提交时间：{new Date(item.createdAt).toLocaleString("zh-CN", { hour12: false })}</div>
               <div style={{ wordBreak: "break-all" }}>编号：{item.id}</div>
-              <div style={{ wordBreak: "break-all" }}>匿名设备：{item.anonId.slice(0, 12)}…</div>
+              {/* 设备码点得动：跳到「设备额度」按码搜到那台设备，直接改次数 */}
+              <div>
+                设备：
+                {item.deviceCodeDisplay ? (
+                  <Link
+                    href={`/admin/devices?q=${item.deviceCode}`}
+                    style={{ color: "var(--primary)", fontFamily: "ui-monospace, Menlo, monospace" }}
+                  >
+                    {item.deviceCodeDisplay}
+                  </Link>
+                ) : (
+                  <span>未分配识别码</span>
+                )}
+              </div>
             </div>
           </div>
 

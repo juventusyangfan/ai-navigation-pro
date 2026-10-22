@@ -109,8 +109,8 @@ npm run build && pm2 reload admin --update-env
 | `ZW_LLM_DISABLE_THINKING` | | 默认 `1`（关闭思考）。换不支持该参数的网关时设 `0` |
 | `ZW_TEXT_KEY` | ✅ | 作文正文加密密钥（32 字节）。**换掉后旧记录正文不可解密**，报告仍可看 |
 | `ZW_IP_SALT` | | IP 哈希盐，建议改掉默认值 |
-| `ZW_DAILY_LIMIT` | | 单设备每日次数，默认 3 |
-| `ZW_GLOBAL_DAILY_CAP` | | 全站每日总次数，默认 300（防批量换 Cookie 刷） |
+| `ZW_DAILY_LIMIT` | | 单设备每日次数，默认 3。**可被后台按设备覆盖**（见第五节） |
+| `ZW_GLOBAL_DAILY_CAP` | | 全站每日总次数，默认 300（防批量换 Cookie 刷）。后台放开个人次数也不会绕过它 |
 | `ZW_CRON_TOKEN` | | 内部接口凭证。**不配就是关闭状态**（一律 401） |
 | `NEXT_PUBLIC_MP_QR` | | 服务号二维码路径，如 `/qr/mp.png` |
 | `NEXT_PUBLIC_WORK_QR` | | 企微二维码路径，如 `/qr/work.png` |
@@ -137,8 +137,11 @@ npm run build && pm2 reload admin --update-env
 | POST | `/api/evaluate` | 提交作文，返回报告 |
 | GET | `/r/[id]` | 报告页（凭 id 直接访问，id 为 cuid 不可枚举） |
 | GET | `/api/health` | 健康检查，只报配置是否就位 |
+| GET | `/api/device` | 家长端：签发匿名身份并返回**本机识别码**与今日剩余次数 |
 | GET | `/api/internal/reviews` | 内部列表，需 `x-cron-token` 头 |
 | GET | `/api/internal/reviews/[id]` | 内部单篇详情，需 `x-cron-token` 头 |
+| GET | `/api/internal/devices` | 设备额度列表，需 `x-cron-token` 头 |
+| PATCH | `/api/internal/devices/[code]` | 改某台设备的每日额度，需 `x-cron-token` 头 |
 
 `/api/internal/reviews` 的参数（全部可选，2026-10 为 admin 后台扩展）：
 
@@ -178,6 +181,52 @@ curl -H "x-cron-token: $ZW_CRON_TOKEN" \
 ```
 
 返回里含解密后的正文，属于敏感数据，只在服务端之间调用，别在浏览器里打开。
+
+### 设备识别码与人工开额度
+
+家长加了企微，要给他多测几次。但服务端只知道 Cookie 里的匿名 ID，没有家长身份。
+所以每台设备配一个 **6 位识别码**（去掉 `0/1/O/I/L` 等电话里最容易听错的字符）：
+
+- 家长打开测评页，页脚显示 `本机识别码 ABC-DEF`；
+- 家长念给老师 → 老师在后台（admin → 服务 → 设备额度）按码搜到 → 改额度；
+- 识别码只是「给人看的标签」，权限绑在 `anonId` 上，前端拿不到 code→anonId 的映射。
+
+三档额度（存 `Device` 表）：
+
+| 状态 | 字段 | 效果 |
+|---|---|---|
+| 默认 | `limitEnabled=true, customLimit=null` | 按 `ZW_DAILY_LIMIT`（3 次） |
+| 自定义 | `limitEnabled=true, customLimit=N` | 每天 N 次（1—200） |
+| 不限 | `limitEnabled=false` | 不限制个人次数，**仍受全站上限** |
+
+```bash
+# 列设备（sync=1 先给历史设备补识别码）
+curl -H "x-cron-token: $ZW_CRON_TOKEN" \
+  "https://zuowen.eanavi.com/api/internal/devices?page=1&sync=1"
+
+# 放开到每天 20 次
+curl -X PATCH -H "x-cron-token: $ZW_CRON_TOKEN" -H "Content-Type: application/json" \
+  -d '{"limitEnabled":true,"customLimit":20,"note":"张妈妈·四年级"}' \
+  "https://zuowen.eanavi.com/api/internal/devices/ABC-DEF"
+
+# 完全不限
+curl -X PATCH -H "x-cron-token: $ZW_CRON_TOKEN" -H "Content-Type: application/json" \
+  -d '{"limitEnabled":false}' "https://zuowen.eanavi.com/api/internal/devices/ABC-DEF"
+
+# 恢复默认
+curl -X PATCH -H "x-cron-token: $ZW_CRON_TOKEN" -H "Content-Type: application/json" \
+  -d '{"limitEnabled":true,"customLimit":null}' "https://zuowen.eanavi.com/api/internal/devices/ABC-DEF"
+```
+
+**两个必须知道的边界**：
+
+1. 家长换手机、换浏览器或清缓存 → `anonId` 变了，识别码也变，需要重新开一次。
+   匿名方案绕不开这一点；换来的是库里没有任何可识别家长身份的信息。
+2. `note` 只写内部看得懂的标签（「张妈妈·四年级」），**不要填手机号、微信号、孩子姓名**。
+   一旦存了，这个库就从「匿名测评」变成「儿童与家长身份关联库」，隐私条款要整体重写。
+
+历史设备（`Device` 表上线前就提交过的）没有识别码，后台设备页首次打开会自动补齐，
+也可以手动带 `?sync=1`。这是唯一会在 GET 里写库的地方，所以做成显式参数触发。
 
 提交示例：
 
@@ -244,14 +293,16 @@ zuowen/
 │   ├── r/[id]/page.tsx         报告页（服务端渲染）
 │   └── api/
 │       ├── evaluate/route.ts   核心：限额 → 取正文 → 评测 → 归一化 → 加密入库
+│       ├── device/route.ts     家长端：签发匿名身份 + 返回本机识别码
 │       ├── health/route.ts
-│       └── internal/           内部查看（token）：reviews 列表 + reviews/[id] 详情
+│       └── internal/           内部接口（token）：reviews 列表/详情 + devices 列表/改额度
 ├── src/lib/
 │   ├── rubric.ts               评分规则：prompt、归一化、合规过滤 ← 改评分先看这个
 │   ├── grade.ts                六个年级的字数区间与评分侧重
 │   ├── llm.ts                  OpenAI 兼容多模态调用（超时/重试/错误分类）
 │   ├── crypto.ts               正文字段加密
-│   ├── quota.ts                匿名 ID 与每日限额
+│   ├── quota.ts                匿名 ID、Cookie 下发、每日限额与全站熔断
+│   ├── device.ts               设备识别码（6 位可读码）与三档额度计算 ← 改额度先看这个
 │   ├── internal.ts             内部接口鉴权（恒定时间比对）+ 北京时间切日
 │   └── http.ts                 统一 JSON 出口
 ├── src/components/QrCard.tsx   二维码（不存在时优雅降级）

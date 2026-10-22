@@ -516,3 +516,44 @@ body {
   margin: 10px 0 0;
   text-align: center;
 }
+
+/* ---------- 测评次数与家长机识别码 ---------- */
+/* 测评页与结果页共用：字号小、颜色淡，不抢「开始测评」的注意力 */
+.quota-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+
+.quota-text {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 次数用完的提示：橙色而不是红色，避免家长以为系统出错 */
+.limit-tip {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #fff4e5;
+  border: 1px solid #ffd8a8;
+  color: #8a5300;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* 结果页顶部「本机最近一次」小标签 */
+.mine-tag {
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: #eef4fd;
+  color: var(--primary);
+  font-size: 11px;
+}
+

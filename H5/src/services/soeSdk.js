@@ -31,16 +31,31 @@ export function loadSoeSdk() {
   return sdkLoading
 }
 
-export async function fetchCredential() {
+export async function fetchCredential(ticket) {
   const base = import.meta.env.VITE_API_BASE || ''
+  const headers = {}
+  // 票据由「开始测评」时签发（那一步已经扣过次数）。服务端凭票才发密钥，
+  // 否则绕开首页直接调接口就能无限评测，额度等于没做。
+  if (ticket) headers['X-Quota-Ticket'] = ticket
   let res
   try {
-    res = await fetch(`${base}/api/soe/credential`, { cache: 'no-store' })
+    res = await fetch(`${base}/api/soe/credential`, { cache: 'no-store', headers })
   } catch (e) {
     throw credError('无法连接密钥服务，请确认已启动 npm run server（默认 127.0.0.1:8787）')
   }
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw credError(data.message || `获取密钥失败（HTTP ${res.status}）`)
+  if (!res.ok) {
+    // 401/429 是「票」的问题（无票 / 过期 / 换密钥次数超限），不是密钥配置错。
+    // 必须分开提示，否则会把人误导去翻 server/.env。
+    if (res.status === 401 || res.status === 429) {
+      const err = new Error(
+        data.message || '测评凭证已失效，请回首页重新点「开始测评」（不会重复扣次数）。'
+      )
+      err.isQuota = true
+      throw err
+    }
+    throw credError(data.message || `获取密钥失败（HTTP ${res.status}）`)
+  }
   return data
 }
 
@@ -191,9 +206,9 @@ export function normalizeResult(res) {
  * 仅 ref_text 因题型不同而变化；初始化参数与调试记录保持一致。
  * @returns {{done: Promise<object>, stop: Function, getAudio: Function}}
  */
-export async function startReadAloud({ refText, evalMode = 2, scoreCoeff = 2.5, onChange } = {}) {
+export async function startReadAloud({ refText, evalMode = 2, scoreCoeff = 2.5, onChange, ticket } = {}) {
   const Sdk = await loadSoeSdk()
-  const cred = await fetchCredential()
+  const cred = await fetchCredential(ticket)
 
   const params = {
     appid: String(cred.appid || ''),

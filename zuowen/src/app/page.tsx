@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { postJson } from "@/lib/api-client";
+import { getJson, postJson } from "@/lib/api-client";
 import QrCard from "@/components/QrCard";
 
 /** 二维码走构建期注入的环境变量，图没放也不至于渲染出破图 */
@@ -59,6 +59,36 @@ export default function Page() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [busyPhoto, setBusyPhoto] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // 本机识别码：家长要放开次数时，把这个码发给老师即可。
+  // 拿不到就不显示 —— 它只是辅助信息，不该让页脚出现一块「加载失败」。
+  const [dev, setDev] = useState<{ display: string; limited: boolean; remaining: number | null } | null>(
+    null,
+  );
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getJson<{ code: string; display: string; limited: boolean; remaining: number | null }>("/api/device")
+      .then((r) => {
+        if (alive && r.ok) setDev({ display: r.data.display, limited: r.data.limited, remaining: r.data.remaining });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const copyCode = useCallback(async () => {
+    if (!dev) return;
+    try {
+      await navigator.clipboard.writeText(dev.display);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 1800);
+    } catch {
+      /* 非 https 或用户拒绝授权时静默失败，家长仍可手抄 */
+    }
+  }, [dev]);
 
   useEffect(() => {
     try {
@@ -300,6 +330,22 @@ export default function Page() {
       </section>
 
       <footer className="ft">
+        {dev && (
+          <p className="devcode">
+            本机识别码
+            <b>{dev.display}</b>
+            <button type="button" onClick={copyCode}>
+              {copiedCode ? "已复制" : "复制"}
+            </button>
+            {dev.limited && dev.remaining !== null && dev.remaining <= 1 && (
+              <span className="quota">
+                {dev.remaining === 0
+                  ? "今天的次数已用完，把这个码发给老师可以多练几篇"
+                  : "今天还剩 1 次，想多练可以把这个码发给老师"}
+              </span>
+            )}
+          </p>
+        )}
         <p>本工具由程序自动生成点评，仅用于写作练习参考，不是考试评分，也不作为任何评价依据。</p>
         <p>不收集孩子姓名、学校、班级等信息。</p>
       </footer>

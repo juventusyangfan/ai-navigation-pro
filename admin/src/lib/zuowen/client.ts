@@ -68,13 +68,17 @@ function hintForStatus(status: number): string {
   return "";
 }
 
+type Query = Record<string, string | number | undefined>;
+
 /**
- * 发起一次内部 GET。
+ * 内部请求的公共实现（GET / PATCH 共用一套解析顺序）。
  * @param path 以 / 开头，例如 "/api/internal/reviews"
  */
-export async function zuowenGet<T>(
+async function zuowenRequest<T>(
+  method: "GET" | "PATCH",
   path: string,
-  params: Record<string, string | number | undefined> = {},
+  params: Query = {},
+  body?: unknown,
   opts: { timeoutMs?: number } = {},
 ): Promise<ZuowenResult<T>> {
   const base = baseUrl();
@@ -94,7 +98,12 @@ export async function zuowenGet<T>(
 
   try {
     const res = await fetch(url, {
-      headers: { "x-cron-token": token() },
+      method,
+      headers: {
+        "x-cron-token": token(),
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal: ctrl.signal,
       cache: "no-store",
     });
@@ -145,6 +154,29 @@ export async function zuowenGet<T>(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** 发起一次内部 GET。 */
+export async function zuowenGet<T>(
+  path: string,
+  params: Query = {},
+  opts: { timeoutMs?: number } = {},
+): Promise<ZuowenResult<T>> {
+  return zuowenRequest<T>("GET", path, params, undefined, opts);
+}
+
+/**
+ * 发起一次内部 PATCH（后台改设备额度用）。
+ *
+ * 写操作不走 GET 的原因不只是语义：zuowen 的内部接口对非 GET 方法没有额外防护，
+ * 但把「改额度」做成 PATCH 至少能避免一次误点浏览器地址栏就把家长次数清空。
+ */
+export async function zuowenPatch<T>(
+  path: string,
+  body: unknown,
+  opts: { timeoutMs?: number } = {},
+): Promise<ZuowenResult<T>> {
+  return zuowenRequest<T>("PATCH", path, {}, body, opts);
 }
 
 /* ------------------------------------------------------------------ *
@@ -209,6 +241,10 @@ export type EssayDetailItem = EssayListItem & {
   span: [number, number];
   readable: boolean;
   anonId: string;
+  /** 设备可读识别码（没被后台分配过时为 null），据此跳到「设备额度」改次数 */
+  deviceCode?: string | null;
+  deviceCodeDisplay?: string | null;
+  deviceLimit?: { limitEnabled: boolean; customLimit: number | null } | null;
   dimMax: EssayDim;
   dimLabel: Record<keyof EssayDim, string>;
   report: EssayReport | null;
@@ -217,3 +253,42 @@ export type EssayDetailItem = EssayListItem & {
 };
 
 export type EssayDetailPayload = { ok: true; item: EssayDetailItem };
+
+/* ------------------------------------------------------------------ *
+ * 设备额度（2026-10-22）
+ *
+ * 一台「设备」= 一个匿名 Cookie。老板给家长放开次数，实际改的是这台设备的额度：
+ * 家长页脚念出识别码 → 后台按码搜索 → 开关或填次数。
+ * ------------------------------------------------------------------ */
+
+export type DeviceMode = "default" | "custom" | "unlimited";
+
+export type DeviceItem = {
+  code: string;
+  /** 带横杠的展示形式，如 NUS-7QD */
+  display: string;
+  note: string | null;
+  limitEnabled: boolean;
+  customLimit: number | null;
+  mode: DeviceMode;
+  today: number;
+  total: number;
+  lastAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DeviceListPayload = {
+  ok: true;
+  count: number;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  /** 本次顺带补齐识别码的历史设备数量（仅在 sync=1 时可能非 0） */
+  synced: number;
+  items: DeviceItem[];
+  defaults: { dailyLimit: number; globalCap: number; globalUsed: number };
+};
+
+export type DeviceUpdatePayload = { ok: true; item: DeviceItem };

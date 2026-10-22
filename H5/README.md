@@ -72,6 +72,22 @@ node --test scripts/test-tts.mjs   # 服务端合成逻辑单测
 | `#/`（默认） | `src/pages/Assessment.vue` 测评页 | **年级选择**后加载对应完整试卷；听力播放（TTS/音频）、口语题（模仿朗读/情景交际/信息转述）全部调用智聆真评（SDK 内置录音+评测+计时+回放）、选择题本地判分、逐题提交，产出结构化作答数据 |
 | `#/result` | `src/pages/Result.vue` 结果分析页 | 总分、五大维度得分条、逐题明细与录音回放、规则化改进建议 |
 
+### 再次进入时的行为（上次结果自动呈现）
+
+本机测过一次之后，**下次打开页面直接停在结果页**，而不是又回到选年级的首页。
+
+三条实现约束（`src/router.js`）：
+
+1. 只在默认路径（无 hash 或 `#/`）时跳，用户自己打开别的地址一律尊重；
+2. **每个会话只自动跳一次**——否则从结果页点「再测一次」回到首页后又被推回来，会像卡死；
+3. 用 `location.replace` 而不是给 hash 赋值，地址栏与内容一致，返回键不会退回空首页。
+
+结果页顶部会显示「本机最近一次」标签；若是自动回来的，多一句说明并提示点底部「再测一次」。
+首页同时保留「上次测评 X 分 · 查看完整结果」的入口，后悔点「再测一次」也能翻回去。
+
+结果存在 `localStorage`（`h5-speaking:last-result`），因此：换设备、换浏览器、清缓存后不再自动进入；
+录音回放依旧只在当前会话有效（blob 不落盘），刷新后只能看分数与文字明细。
+
 试卷数据（`src/data/paper.js`，按年级导出 `GRADES` + `papers` + `getPaper()`），每套含四个题型、与中考听说框架对齐：
 
 1. 听后选择（客观题，本地判分）
@@ -160,12 +176,14 @@ H5/
 │   ├── test-tts.mjs               # 服务端合成逻辑单测（切段/拼接/缓存键/校验/Range）
 │   └── verify-audio-playback.cjs  # 播放链路实证（Playwright 模拟无 TTS 的手机环境）
 ├── server/
-│   ├── index.mjs             # HTTP 入口：只装配路由（/api/soe/*、/api/tts/*）
+│   ├── index.mjs             # HTTP 入口：只装配路由（/api/soe/*、/api/tts/*、/api/quota*、/api/internal/*）
 │   ├── soe.mjs               # 智聆凭证：STS 临时密钥 / 本地调试静态密钥
 │   ├── tts.mjs               # 腾讯云语音合成：角色分声 / 调用 / 拼接 / 缓存 / 白名单 / 限流
+│   ├── quota.mjs             # 家长机识别码 + 每日次数 + 全站总次数 + 票据（JSON 落盘）
 │   ├── http-util.mjs         # 传输层工具：JSON与二进制响应、Range、请求体、.env 加载
 │   ├── .cache/tts/           # 合成音频磁盘缓存（含 .json 审计元数据，已 gitignore）
-│   └── .env.example          # SOE_* / TTS_* 配置样例
+│   ├── .data/                # 额度数据与票据签名密钥（已 gitignore，迁移时整目录带走）
+│   └── .env.example          # SOE_* / TTS_* / H5_* 配置样例
 ├── public/
 │   ├── vendor/
 │   │   └── TencentSOE-1.0.1.js # 腾讯云官方 SOE Web SDK（v1.0.1，需 type="module" 加载）
@@ -185,10 +203,12 @@ H5/
     │   ├── audioPlayer.js    # 题目音频播放：真人录音优先，其次服务端语音合成（无浏览器 TTS）
     │   ├── player.js         # 录音回放：原生播放 + duration 修复 + WebAudio 降级
     │   ├── evaluator.js      # 评分：选择题判分 + 口语题消费智聆真实结果 + 报告汇总 + 建议
+    │   ├── quota.js          # 次数与识别码：只做展示 + 开始测评时领票（计数在服务端）
     │   ├── store.js          # 结果存储（localStorage）与音频 URL 内存缓存
-    │   └── soeSdk.js         # 智聆 Web SDK 封装：加载 SDK、取密钥、发起评测、解析结果
+    │   └── soeSdk.js         # 智聆 Web SDK 封装：加载 SDK、取密钥（带票）、发起评测、解析结果
     ├── components/
-    │   └── FollowQr.vue      # 引流二维码卡（服务号 + 老师企微，图片缺失时降级）
+    │   ├── FollowQr.vue      # 引流二维码卡（服务号 + 老师企微，图片缺失时降级）
+    │   └── DeviceCode.vue    # 本机识别码展示 + 复制
     ├── assets/
     │   └── qr/               # mp.png（服务号）/ work.png（老师企微）
     └── pages/
@@ -505,3 +525,91 @@ curl -s "http://127.0.0.1:8787/api/tts/health?probe=1"
 ```
 
 把真人录音放进 `public/audio/`，由 Nginx 直接托管，连服务端合成都不会触发。
+
+---
+
+## 九、家长机识别码与测评次数
+
+**结论：一次测评扣 1 次，记账在服务端；前端只显示、不计数。**
+
+为什么必须服务端：智聆评测按调用计费，次数记在 `localStorage` 等于没做——清缓存、开无痕、学校机房统一装浏览器都能绕过。所以「今天测了几次」由 `server/quota.mjs` 记在 `server/.data/quota.json`。
+
+### 9.1 三个概念
+
+| 概念 | 是什么 | 存在哪 |
+|---|---|---|
+| 设备（device） | Cookie `h5_uid` 里的 32 位随机串，与真实身份无关 | 浏览器 Cookie（HttpOnly）+ `quota.json` |
+| 识别码（code） | 6 位可读码，形如 `7K3-M9P`，家长念给老师、老师按码搜 | `quota.json` |
+| 票据（ticket） | 开始测评时签发的 HMAC 串，取密钥凭它放行 | 页面内存，不落盘 |
+
+为什么要有票据：一次测评要取 4 次以上密钥（每道口语题一次，重录还要再取）。若在取密钥时扣次数，扣的是「题」不是「测评」，额度语义就错了。所以扣减只发生在「开始测评」那一下。
+
+识别码字符集去掉了 `0 O 1 I L`——电话或语音里最容易听错，念错一位就搜不到。码本身不是凭据：服务端不暴露 code→设备 的映射，知道别人的码也做不了任何事。
+
+### 9.2 额度怎么算
+
+| 层级 | 默认 | 环境变量 | 说明 |
+|---|---|---|---|
+| 个人每日 | 2 次 | `H5_DAILY_LIMIT` | 单设备每天可测评的次数（够一次正式测评 + 一次重测） |
+| 全站每日 | 200 次 | `H5_DAILY_TOTAL_CAP` | 成本硬顶，**不因个人被放开而豁免** |
+
+个人额度三档（后台按设备设）：`default` 用默认值 / `custom` 指定 N 次（1—200）/ `unlimited` 不限。
+「不限」只解除个人上限，全站总量仍然生效——那是防批量刷爆账单的最后一道。
+
+超限给的是橙色提示 + 引流二维码，不是红色报错：`429 DEVICE_LIMIT` 是本机次数用完，`503 GLOBAL_CAP` 是今日全站名额用完。
+
+### 9.3 接口
+
+| 方法 | 路径 | 鉴权 | 说明 |
+|---|---|---|---|
+| GET | `/api/quota` | — | 本机识别码、今日已用/上限/剩余、全站已用/剩余；首次访问下发 `h5_uid` |
+| POST | `/api/quota/start` | — | 扣 1 次并返回票据；`429` / `503` 为两种超限 |
+| GET | `/api/soe/credential` | `X-Quota-Ticket` | 无票/伪造/过期 → `401`；同一张票换密钥超上限 → `429` |
+| GET | `/api/internal/quota/devices` | `x-cron-token` | 设备列表，`?q=7K3M9P` 按码搜（横杠可省）、`?page=&pageSize=` |
+| PATCH | `/api/internal/quota/devices/<CODE>` | `x-cron-token` | 改额度：`{limitMode, customLimit, note}` |
+
+内部接口在 `H5_INTERNAL_TOKEN` 未配置时**整体关闭**（fail-closed，不是无密码放行）。例：
+
+```bash
+# 家长发来识别码 7K3-M9P
+curl -H "x-cron-token: $H5_INTERNAL_TOKEN" \
+  "https://h5.eanavi.com/api/internal/quota/devices?q=7K3M9P"
+
+# 放开为不限次数，并写一句只给老板自己看的备注
+curl -X PATCH -H "x-cron-token: $H5_INTERNAL_TOKEN" -H "Content-Type: application/json" \
+  -d '{"limitMode":"unlimited","note":"家长已加企微"}' \
+  "https://h5.eanavi.com/api/internal/quota/devices/7K3-M9P"
+```
+
+`note` 只写自己看得懂的标签（「张妈妈·四年级」）。**不要填手机号、微信号、孩子姓名**——一填，这个库就从「匿名测评」变成「儿童与家长身份关联库」，隐私口径得整体重写。
+
+### 9.4 部署注意
+
+- `server/.data/` 必须持久化（迁移服务器时整目录带走）。里面除 `quota.json`，还有自动生成的 `.secret`（票据签名密钥）——删了它，已签发的票全部失效，但功能仍可用。
+- 额度服务跑在 `server/index.mjs` 里，**pm2 只能单实例**。多实例要么各记各的（限额翻倍），要么显式配同一个 `H5_QUOTA_SECRET` 并把 `H5_DATA_DIR` 指向共享盘。
+- 应急：`H5_QUOTA_ENFORCE=0` 只记账不拦截。额度服务自身异常时代码是 **fail-open**（记不上账就放行）——丢掉一次计数，好过让所有家长都测不了。
+- 只按**北京时间**切日（服务器多为 UTC，不显式 +8 会让「今天」从早上 8 点才算起）。
+
+### 9.5 已知边界（都是刻意接受的）
+
+| 情况 | 结果 |
+|---|---|
+| 清缓存 / 换浏览器 / 换手机 | 识别码变新的，个人次数重置。匿名方案的固有代价——换来的是库里没有任何可识别家长身份的信息 |
+| 浏览器禁用 Cookie | 每次都是新设备，个人次数失效，只剩全站总上限兜底 |
+| 家长把识别码发给别人 | 别人拿不到任何权利；额度永远绑在设备而不是码上 |
+| 一张票被反复用来取密钥 | 单票上限 40 次（`H5_TICKET_MAX_CREDENTIALS`）。进程重启该计数归零，票本身仍有效，不会把家长打断 |
+| 家长同时开两个标签页测 | 各扣各自「开始」那一下，互不影响 |
+
+### 9.6 验收记录（2026-10-22 本机实测）
+
+| 场景 | 结果 |
+|---|---|
+| 首次访问 | 下发 `h5_uid`，返回识别码 `78Q-A6X`，`remaining` 正确 |
+| 第 1 / 2 次开始 | 200，`used` 递增，页面正常进入答题 |
+| 第 3 次开始（上限设 2） | 429 `DEVICE_LIMIT`，页面停在首页并显示橙色提示 + 二维码 |
+| 全站名额用尽 | 503 `GLOBAL_CAP`，同址提示 |
+| 无票 / 伪造票取密钥 | 401 `NO_TICKET` / `BAD_TICKET` |
+| 后台改 `unlimited` 后 | 立即 200 放行，`unlimited=true` |
+| 服务重启 | 设备、额度、备注全部保留；旧设备仍按 `unlimited` 放行 |
+| 上次结果自动进入 | 重开页面直接到 `#/result`；点「再测一次」回首页后不再推回，刷新也不推回 |
+

@@ -674,6 +674,36 @@ details.origin pre {
   margin: 0 0 4px;
 }
 
+/* 本机识别码：家长要念给老师听，得能看清；但它是辅助信息，不能抢主体 */
+.ft .devcode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+.ft .devcode b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  color: #6f6a62;
+}
+.ft .devcode button {
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  color: #8d8579;
+  cursor: pointer;
+}
+.ft .devcode button:active {
+  background: #f3efe8;
+}
+.ft .devcode .quota {
+  color: #b8863b;
+}
+
 /* ---------- 隐私弹层 ---------- */
 .mask {
   position: fixed;

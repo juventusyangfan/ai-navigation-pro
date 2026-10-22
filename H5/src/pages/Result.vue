@@ -7,7 +7,10 @@
 
     <template v-else>
       <section class="card score-card">
-        <p class="muted small">{{ result.paperTitle }}</p>
+        <p class="muted small">
+          <span class="mine-tag">本机最近一次</span>
+          {{ result.paperTitle }}
+        </p>
         <div class="score">
           <span class="score-num">{{ result.totalScore }}</span>
           <span class="score-max">/ {{ result.maxScore }}</span>
@@ -15,6 +18,9 @@
         <p class="muted small">
           {{ new Date(result.createdAt).toLocaleString('zh-CN') }}
           <span class="badge">智聆真评</span>
+        </p>
+        <p v-if="autoEntered" class="muted small">
+          这是本机上一次的测评结果（下次打开会直接回到这里）。想重新测，点最下面的「再测一次」。
         </p>
       </section>
 
@@ -88,21 +94,50 @@
       <div class="actions">
         <button class="btn btn-ghost" @click="navigate('/')">再测一次</button>
       </div>
+
+      <div v-if="quotaText || (quota && quota.code)" class="quota-line">
+        <span v-if="quotaText" class="quota-text">{{ quotaText }}</span>
+        <DeviceCode :code="(quota && quota.code) || ''" />
+      </div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { navigate } from '../router.js'
-import { loadResult, getAudio } from '../services/store.js'
+import { loadResult, getAudio, isAutoEntered } from '../services/store.js'
 import { playRecorded, stopPlayback } from '../services/player.js'
+import { fetchQuota } from '../services/quota.js'
 import FollowQr from '../components/FollowQr.vue'
+import DeviceCode from '../components/DeviceCode.vue'
 
 const result = ref(loadResult())
 const playingId = ref('')
 const playInfo = ref(null)
 const playError = ref('')
+
+// 是否是「打开页面自动回到结果页」进来的（而不是刚提交过来）。
+// 只用来决定要不要多解释一句，避免刚测完就看到「这是上一次的结果」的困惑。
+const autoEntered = ref(isAutoEntered())
+
+const quota = ref(null)
+const quotaText = computed(() => {
+  const q = quota.value
+  if (!q) return ''
+  if (q.totalRemaining !== undefined && q.totalRemaining <= 0) return '今日测评名额已用完'
+  if (q.unlimited) return '本机今日不限次数'
+  if (q.remaining === null || q.remaining === undefined) return ''
+  if (q.remaining <= 0) return '今日次数已用完，明天再来'
+  return `今日还可测评 ${q.remaining} 次`
+})
+
+onMounted(() => {
+  // 拿不到就不显示次数（服务端未启用额度），页面照常
+  fetchQuota().then((q) => {
+    quota.value = q
+  })
+})
 
 function short(text) {
   const t = String(text || '')

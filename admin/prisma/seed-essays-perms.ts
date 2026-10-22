@@ -1,5 +1,5 @@
 /**
- * 作文测评（zuowen）· RBAC 权限补丁（幂等，可安全在生产库上执行）
+ * 作文测评 / 设备额度（zuowen）· RBAC 权限补丁（幂等，可安全在生产库上执行）
  *
  * ⚠️ 不要用 `npm run db:seed` 加权限！
  *    prisma/seed.ts 开头会 deleteMany 清空 tools / sop_paths / sop_steps 等内容表，
@@ -7,18 +7,29 @@
  *
  * 运行：npm run db:seed:essays
  *
- * 只给 read：
+ * essays（作文看板）：只给 read
  *   后台对作文数据是**只读看板** —— 不提供删除（删了家长手里的报告就 404），
- *   不提供正文导出（导出文件离开系统后无法追踪）。所以不需要 write / delete 权限，
- *   给了反而是个风险面。
+ *   不提供正文导出（导出文件离开系统后无法追踪）。
+ *
+ * devices（设备额度，2026-10-22 新增）：editor 可读可写，reviewer 只读
+ *   这是后台唯一的写能力：给某台设备放开/收紧每日次数。
+ *   不给 reviewer 写权限，是因为它直接控制成本与「谁能免限额」，
+ *   和审核员的职责无关，出错代价也不对等。
  */
 import { PrismaClient } from "@prisma/client";
 
 const db = new PrismaClient();
 
 const MATRIX: Record<string, { resource: string; action: string }[]> = {
-  editor: [{ resource: "essays", action: "read" }],
-  reviewer: [{ resource: "essays", action: "read" }],
+  editor: [
+    { resource: "essays", action: "read" },
+    { resource: "devices", action: "read" },
+    { resource: "devices", action: "write" },
+  ],
+  reviewer: [
+    { resource: "essays", action: "read" },
+    { resource: "devices", action: "read" },
+  ],
 };
 
 async function main() {
