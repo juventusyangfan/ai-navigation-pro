@@ -5,6 +5,14 @@
       <h2 class="card-title">英语听说能力测评</h2>
       <p class="muted">请先选择测评年级，加载对应完整试卷（全程由腾讯云智聆口语评测提供发音评测）。</p>
 
+      <!-- 上次测评结果入口：本机测过一次后，随时能翻回来看看 -->
+      <button v-if="last" class="last-result" type="button" @click="openLast">
+        <span class="last-result-main">
+          上次测评 <b>{{ last.totalScore }}</b> / {{ last.maxScore }} 分
+        </span>
+        <span class="last-result-sub">{{ lastTime }} · 点此查看完整结果</span>
+      </button>
+
       <div class="grades">
         <button
           v-for="g in GRADES"
@@ -27,9 +35,19 @@
           <li>首次点击录音会请求麦克风权限，请选择「允许」。</li>
           <li>本测评为练习反馈，不代表任何考试得分。</li>
         </ul>
-        <button class="btn btn-primary btn-block" @click="start">开始测评（{{ gradeLabel }}）</button>
+        <button class="btn btn-primary btn-block" :disabled="starting" @click="start">
+          {{ starting ? '正在准备…' : `开始测评（${gradeLabel}）` }}
+        </button>
       </template>
       <p v-else class="muted small">尚未选择年级。</p>
+
+      <!-- 次数用完时的提示。必须有出路：下面紧跟引流二维码 -->
+      <p v-if="limitTip" class="limit-tip">{{ limitTip }}</p>
+
+      <div v-if="quotaText || (quota && quota.code)" class="quota-line">
+        <span v-if="quotaText" class="quota-text">{{ quotaText }}</span>
+        <DeviceCode :code="(quota && quota.code) || ''" />
+      </div>
     </section>
 
     <!-- 未开始：关注引导。放在首屏说明之后，不挡「开始测评」 -->
@@ -180,8 +198,10 @@ import {
 import { startReadAloud, pcmToWav, toArrayBuffer } from '../services/soeSdk.js'
 import { playRecorded, stopPlayback } from '../services/player.js'
 import { buildResult } from '../services/evaluator.js'
-import { saveResult, setAudio } from '../services/store.js'
+import { loadResult, saveResult, setAudio, markAutoEntered } from '../services/store.js'
+import { fetchQuota, startSession } from '../services/quota.js'
 import FollowQr from '../components/FollowQr.vue'
+import DeviceCode from '../components/DeviceCode.vue'
 
 const started = ref(false)
 const selectedGrade = ref('')
@@ -206,6 +226,42 @@ const playErr = ref('') // 播放失败的可读提示（独立于页面底部�
 // 服务端语音合成是否不可用（页面加载时探测 /api/tts/health）。
 // 不可用时提前降级展示听力原文，而不是等用户点了播放才失败。
 const ttsDown = ref(false)
+
+// ── 家长机识别码与测评次数 ──────────────────────────────────────────────
+// 次数一律由服务端记账（前端只会显示），领票发生在点「开始测评」那一刻。
+const last = ref(loadResult())
+const quota = ref(null)
+const starting = ref(false)
+const limitTip = ref('')
+const ticket = ref('')
+
+const lastTime = computed(() => {
+  const t = last.value && last.value.createdAt
+  if (!t) return ''
+  const d = new Date(t)
+  if (Number.isNaN(d.getTime())) return ''
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}`
+})
+
+const quotaText = computed(() => {
+  const q = quota.value
+  if (!q) return ''
+  if (q.totalRemaining !== undefined && q.totalRemaining <= 0) return '今日测评名额已用完'
+  if (q.unlimited) return '本机今日不限次数'
+  if (q.remaining === null || q.remaining === undefined) return ''
+  if (q.remaining <= 0) return '今日次数已用完，明天再来'
+  return `今日还可测评 ${q.remaining} 次`
+})
+
+function openLast() {
+  navigate('/result')
+}
+
+async function refreshQuota() {
+  quota.value = await fetchQuota()
+}
 
 // ── 播放次数持久化：刷新页面不得重置次数（PC/手机语义一致，也防刷新绕过） ──
 const REPLAY_STORE_PREFIX = 'soe-replay-v1:'
@@ -313,10 +369,44 @@ function start() {
     error.value = '请先选择测评年级。'
     return
   }
-  // [!] 必须在用户手势的同步调用栈内解锁音频通道：iOS/Safari 与多数 WebView
-  //   在解锁前会静默丢弃音频，这是「PC 能播、手机没声音」的头号原因之一。
+  if (starting.value) return
+  // [!] unlockAudio 必须留在这个同步栈里：iOS/Safari 与多数 WebView 只认
+  //    「用户手势内」的首次播放，一旦先 await 再解锁，后面所有音频都会被静默丢弃
+  //    （这是「PC 能播、手机没声音」的头号原因）。
+  //    所以顺序固定为：先解锁 → 再异步领票（领票失败不影响解锁，也不会重复解锁）。
   unlockAudio()
   error.value = ''
+  limitTip.value = ''
+  starting.value = true
+  void begin()
+}
+
+/**
+ * 领票 = 扣一次测评次数。
+ *
+ * 刻意放在这里而不是页面加载时：家长只是打开看看，不该被算掉一次。
+ * 也刻意不在「提交」时扣：那样家长做到一半退出就没有记录了。
+ */
+async function begin() {
+  const r = await startSession()
+  starting.value = false
+
+  if (!r.ok) {
+    limitTip.value = r.message || '今天的次数已经用完啦，明天再来吧。'
+    await refreshQuota()
+    return
+  }
+
+  ticket.value = r.ticket || ''
+  if (r.used !== undefined) {
+    quota.value = {
+      ...(quota.value || {}),
+      used: r.used,
+      remaining: r.remaining,
+      limit: r.limit,
+      unlimited: !!r.unlimited
+    }
+  }
   started.value = true
   enterStep()
 }
@@ -411,13 +501,14 @@ async function startRecord() {
   // ref_text 优先级：参考范文(refText) > 朗读/题干(passage) > 听力源文(audioText)
   const refText = item.refText || item.passage || item.audioText || ''
   try {
-    ctrl = await startReadAloud({ refText, evalMode: 2, scoreCoeff: 2.5 })
+    ctrl = await startReadAloud({ refText, evalMode: 2, scoreCoeff: 2.5, ticket: ticket.value })
   } catch (e) {
     const msg = e.message || String(e)
     // 密钥/服务类问题单独提示，引导去配置密钥服务，而不是当评测失败
     if (e.isCredential) {
       credError.value = msg + '（请确认 server 已配置真实密钥并运行 npm run server）'
     } else {
+      // 含票据失效（e.isQuota）：提示语本身已说明「回首页重新开始」，直接展示即可
       error.value = msg
     }
     ctrl = null
@@ -538,6 +629,8 @@ function prev() {
 function submit() {
   const result = buildResult(paper.value, answers)
   saveResult(result)
+  // 标记「这次是刚测完跳过来的」，结果页就不会多解释一句「这是上一次的结果」
+  markAutoEntered(false)
   navigate('/result')
 }
 
@@ -576,6 +669,8 @@ onMounted(() => {
   probeTts().then((ok) => {
     ttsDown.value = !ok
   })
+  // 识别码与今日剩余次数：拿不到就整块隐藏（服务端未启用），不打扰家长
+  void refreshQuota()
   document.addEventListener('pointerdown', onFirstGesture, { passive: true })
   document.addEventListener('touchstart', onFirstGesture, { passive: true })
   document.addEventListener('visibilitychange', onVisibilityChange)
@@ -658,4 +753,33 @@ onUnmounted(() => {
   color: #8a6100;
   line-height: 1.5;
 }
+
+/* 上次测评入口：做成整块可点，家长一眼看到「我上次多少分」 */
+.last-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid #cfe0f7;
+  border-radius: 10px;
+  background: #f3f8ff;
+  cursor: pointer;
+}
+.last-result-main {
+  font-size: 14px;
+  color: var(--text);
+}
+.last-result-main b {
+  font-size: 18px;
+  color: var(--primary);
+}
+.last-result-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 次数用完的提示与「额度 + 识别码」一行在全局样式里（结果页也用同一套） */
 </style>

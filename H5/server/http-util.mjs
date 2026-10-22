@@ -6,8 +6,10 @@ import fs from 'node:fs'
 export function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': process.env.SOE_ALLOW_ORIGIN || '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+    // X-Quota-Ticket 必须显式放行：跨域（非反代同源）时预检不通过，
+    // 浏览器会直接拦掉取密钥请求，表现成「开始测评后一直报网络错误」。
+    'Access-Control-Allow-Headers': 'Content-Type, X-Quota-Ticket',
+    'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS'
   }
 }
 

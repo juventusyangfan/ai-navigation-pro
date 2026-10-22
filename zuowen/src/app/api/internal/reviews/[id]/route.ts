@@ -12,6 +12,7 @@ import { decryptText } from "@/lib/crypto";
 import { guarded, ok, fail } from "@/lib/http";
 import { bandOf } from "@/lib/grade";
 import { readInternalAuth } from "@/lib/internal";
+import { formatCode } from "@/lib/device";
 import { DIM_LABEL, DIM_MAX, type DimKey } from "@/lib/rubric";
 
 export const runtime = "nodejs";
@@ -32,6 +33,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     const band = bandOf(row.grade);
     const withText = req.nextUrl.searchParams.get("text") !== "0";
 
+    // 这条件文是哪台设备交的：后台要能一眼看到识别码，直接跳过去改额度。
+    // GET 只读，不在这里补建 —— 缺码的历史设备由设备列表的 sync=1 统一补。
+    const dev = await prisma.device.findUnique({
+      where: { anonId: row.anonId },
+      select: { code: true, limitEnabled: true, customLimit: true },
+    });
+
     return ok({
       ok: true,
       item: {
@@ -47,6 +55,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         source: row.source,
         readable: row.readable,
         anonId: row.anonId,
+        // 设备的可读识别码；后台据此调整该设备的每日额度
+        deviceCode: dev?.code ?? null,
+        deviceCodeDisplay: dev ? formatCode(dev.code) : null,
+        deviceLimit: dev ? { limitEnabled: dev.limitEnabled, customLimit: dev.customLimit } : null,
         total: row.total,
         level: row.level,
         model: row.model,

@@ -23,8 +23,7 @@ import { encryptText, hashIp } from "@/lib/crypto";
 import { prisma } from "@/lib/store";
 import { ok, fail, guarded } from "@/lib/http";
 import {
-  ANON_COOKIE,
-  anonCookieOptions,
+  anonCookieHeader,
   dailyLimit,
   globalDailyCap,
   globalUsedToday,
@@ -32,6 +31,7 @@ import {
   readAnonId,
   usedToday,
 } from "@/lib/quota";
+import { ensureDevice, overLimitMessage, planFor } from "@/lib/device";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -142,17 +142,20 @@ async function handle(req: NextRequest): Promise<Response> {
   }
 
   // ---- 限额 ----
+  // 顺序：先看这台设备有没有被后台单独设过额度，再看全站兜底。
+  // 页面一打开就已经签发 Cookie（GET /api/device），正常情况下 existingAnon 有值；
+  // 直接裸调接口的脚本可能没有，此时 used=0 照旧放行 —— 这正是全站上限必须存在的原因。
   const existingAnon = await readAnonId();
   const anonId = existingAnon ?? newAnonId();
-  const limit = dailyLimit();
-  if (existingAnon) {
-    const used = await usedToday(existingAnon);
-    if (used >= limit) {
-      return fail(429, `今天已经测过 ${used} 次啦，明天再来看看孩子的进步吧`, {
-        code: "DEVICE_LIMIT",
-        limit,
-      });
-    }
+  const used = existingAnon ? await usedToday(existingAnon) : 0;
+  const plan = await planFor(anonId, used, dailyLimit());
+  if (plan.limited && plan.limit !== null && used >= plan.limit) {
+    return fail(429, overLimitMessage(plan), {
+      code: "DEVICE_LIMIT",
+      limit: plan.limit,
+      used,
+      mode: plan.mode,
+    });
   }
   const total = await globalUsedToday();
   if (total >= globalDailyCap()) {
@@ -299,6 +302,14 @@ async function persistAndRespond(args: {
     select: { id: true, createdAt: true },
   });
 
+  // 保证这台设备有识别码：家长若绕过首页直接调接口（少见但可能），
+  // 后台也得能按码找到它。失败不影响本次结果，只记日志。
+  try {
+    await ensureDevice(anonId);
+  } catch (e) {
+    console.warn(`[zuowen][evaluate] 识别码分配失败 anon=${anonId.slice(0, 8)}…`, e);
+  }
+
   if (report.flags.length) {
     console.warn(`[zuowen][合规过滤] id=${row.id} flags=${report.flags.join(",")}`);
   }
@@ -317,20 +328,9 @@ async function persistAndRespond(args: {
   });
 
   if (!existingAnon) {
-    res.headers.append("Set-Cookie", serializeCookie(ANON_COOKIE, anonId, anonCookieOptions()));
+    res.headers.append("Set-Cookie", anonCookieHeader(anonId));
   }
   return res;
-}
-
-function serializeCookie(
-  name: string,
-  value: string,
-  opts: ReturnType<typeof anonCookieOptions>,
-): string {
-  const parts = [`${name}=${value}`, `Path=${opts.path}`, `Max-Age=${opts.maxAge}`, "SameSite=Lax"];
-  if (opts.httpOnly) parts.push("HttpOnly");
-  if (opts.secure) parts.push("Secure");
-  return parts.join("; ");
 }
 
 export async function POST(req: NextRequest) {

@@ -7,4 +7,6 @@ dist
 !.env.example
 certs/
 server/.cache/
+# 额度与设备识别码的落盘数据（含 .secret 签名密钥），绝不入库
+server/.data/
 package-lock.json
